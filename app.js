@@ -274,23 +274,50 @@ function enterMarker() {
 /* =====================================================================
    KUIS
    ===================================================================== */
-const quiz = { name: '', kelas: 'X', qs: [], i: 0, score: 0, log: [], answered: false };
+const quiz = { name: '', rombel: '', kelas: 'X', qs: [], i: 0, score: 0, log: [], answered: false };
 const best = {
   get(k) { try { return +localStorage.getItem('arfisma-best-' + k) || 0; } catch { return 0; } },
   set(k, v) { try { localStorage.setItem('arfisma-best-' + k, v); } catch { /* storage diblokir */ } },
 };
 const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(v => v[1]);
 
+// Identitas siswa + pengiriman hasil ke Google Sheets guru (CONFIG.sheetUrl kosong = pengiriman nonaktif).
+const identitasHTML = () => `<label class="field" for="q-name" style="margin-top:12px">Nama lengkap</label><input class="input" id="q-name" autocomplete="name" placeholder="Nama lengkap" value="${esc(quiz.name)}" aria-describedby="q-err">
+    <label class="field" for="q-rombel" style="margin-top:12px">Kelas/rombel</label><input class="input" id="q-rombel" placeholder="Contoh: X IPA 1" value="${esc(quiz.rombel)}">
+    <p id="q-err" role="alert" style="color:var(--err);font-weight:700;font-size:14px;margin-top:6px"></p>
+    ${CONFIG.sheetUrl ? '<p class="muted" style="font-size:13px"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Nama, kelas/rombel, dan nilai kuismu akan dikirim ke spreadsheet guru.</p>' : ''}`;
+function bacaIdentitas() {
+  quiz.name = $('#q-name').value.trim(); quiz.rombel = $('#q-rombel').value.trim();
+  if (CONFIG.sheetUrl && !quiz.name) { $('#q-err').textContent = 'Isi nama lengkap dulu agar hasilmu tercatat.'; $('#q-name').focus(); return false; }
+  quiz.name ||= 'Siswa';
+  return true;
+}
+async function kirimKeGuru(kuis, n) {
+  const el = $('#q-send'); if (!CONFIG.sheetUrl || !el) return;
+  el.textContent = 'Mengirim hasil ke guru…';
+  let ok = false;
+  try {
+    // body teks biasa = "simple request", tidak memicu preflight CORS yang ditolak Apps Script
+    const r = await fetch(CONFIG.sheetUrl, { method: 'POST', body: JSON.stringify({ app: CONFIG.appName, nama: quiz.name, rombel: quiz.rombel, kuis, benar: quiz.score, jumlah: n,
+      rincian: quiz.log.map((l, i) => `${i + 1}. ${l.ok ? '✓' : '✗'} ${l.q.slice(0, 60)}`).join(' | ') }) });
+    ok = (await r.json()).ok === true;
+  } catch { ok = false; }
+  if (!el.isConnected) return;
+  el.innerHTML = ok ? '<i class="fa-solid fa-circle-check" aria-hidden="true" style="color:var(--ok)"></i> Hasil sudah tercatat di spreadsheet guru.'
+    : 'Gagal mengirim hasil ke guru (periksa koneksi internet). <button class="btn small ghost" id="q-resend">Kirim ulang</button>';
+  if (!ok) $('#q-resend').onclick = () => kirimKeGuru(kuis, n);
+}
+
 function enterKuis() {
   $('#kuis-body').innerHTML = `<div class="card"><h2>Pilih kelas</h2>
     <div class="seg" role="group" aria-label="Kelas kuis" id="q-kelas">${Object.entries(KELAS).map(([k, t]) => `<button data-q="${k}" aria-pressed="${quiz.kelas === k}">${t} · ${KUIS[k].length} soal</button>`).join('')}</div>
     <p class="muted" id="q-best" style="margin-top:10px;font-size:14px"></p>
-    <label class="field" for="q-name" style="margin-top:12px">Nama (untuk hasil yang diunduh)</label><input class="input" id="q-name" autocomplete="name" placeholder="Nama lengkap" value="${esc(quiz.name)}">
+    ${identitasHTML()}
     <button class="btn accent" id="q-start" style="margin-top:14px"><i class="fa-solid fa-play" aria-hidden="true"></i> Mulai kuis</button></div>`;
   const showBest = () => { const b = best.get(quiz.kelas); $('#q-best').textContent = b ? `Nilai terbaikmu di ${KELAS[quiz.kelas]}: ${b}` : 'Soal diacak dan setiap jawaban dilengkapi pembahasan.'; };
   showBest();
   $('#q-kelas').onclick = e => { const b = e.target.closest('button'); if (!b) return; quiz.kelas = b.dataset.q; document.querySelectorAll('#q-kelas button').forEach(x => x.setAttribute('aria-pressed', x === b)); showBest(); };
-  $('#q-start').onclick = () => { quiz.name = $('#q-name').value.trim() || 'Siswa'; quiz.qs = shuffle(KUIS[quiz.kelas]); quiz.i = 0; quiz.score = 0; quiz.log = []; renderQ(); };
+  $('#q-start').onclick = () => { if (!bacaIdentitas()) return; quiz.qs = shuffle(KUIS[quiz.kelas]); quiz.i = 0; quiz.score = 0; quiz.log = []; renderQ(); };
 }
 function renderQ() {
   const q = quiz.qs[quiz.i], n = quiz.qs.length; quiz.answered = false;
@@ -322,13 +349,15 @@ function result() {
       <circle cx="70" cy="70" r="54" fill="none" stroke="${nilai >= 60 ? 'var(--ok)' : 'var(--accent)'}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${C * nilai / 100} ${C}" transform="rotate(-90 70 70)"/>
       <text x="70" y="80" text-anchor="middle" font-family="Baloo 2" font-weight="800" font-size="34" fill="var(--fg)">${nilai}</text></svg>
     <p><b>${quiz.score}</b> dari ${n} jawaban benar. ${msg}</p>
+    <p id="q-send" class="muted" aria-live="polite" style="font-size:14px;margin-top:6px"></p>
     <div class="row" style="margin-top:14px"><button class="btn accent" id="q-csv"><i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i> Unduh hasil</button><button class="btn ghost" id="q-again"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Ulangi</button></div></div>
     <div class="card"><h2>Pembahasan</h2><ol class="prose" style="padding-left:20px">${quiz.log.map(l => `<li style="margin-bottom:8px">${l.q}<br><span style="color:${l.ok ? 'var(--ok)' : 'var(--err)'};font-weight:700">${l.ok ? '✓' : '✗'} ${l.jawab}</span>${l.ok ? '' : `<br><span class="muted">Jawaban benar: <b>${l.benar}</b></span>`}</li>`).join('')}</ol></div>`;
   $('#q-res').focus();
+  kirimKeGuru(KELAS[quiz.kelas], n);
   $('#q-again').onclick = enterKuis;
   $('#q-csv').onclick = () => {
     const cell = v => `"${String(v).replace(/"/g, '""')}"`;
-    const rows = [['Nama', 'Kelas', 'Tanggal', 'Benar', 'Jumlah Soal', 'Nilai'].map(cell).join(','), [quiz.name, KELAS[quiz.kelas], new Date().toLocaleString('id-ID'), quiz.score, n, nilai].map(cell).join(','), '',
+    const rows = [['Nama', 'Rombel', 'Kuis', 'Tanggal', 'Benar', 'Jumlah Soal', 'Nilai'].map(cell).join(','), [quiz.name, quiz.rombel, KELAS[quiz.kelas], new Date().toLocaleString('id-ID'), quiz.score, n, nilai].map(cell).join(','), '',
       ['No', 'Soal', 'Jawaban', 'Kunci', 'Status'].map(cell).join(','), ...quiz.log.map((l, i) => [i + 1, l.q, l.jawab, l.benar, l.ok ? 'Benar' : 'Salah'].map(cell).join(','))];
     const url = URL.createObjectURL(new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a'); a.href = url; a.download = `hasil-kuis-fisika-${quiz.kelas}-${quiz.name.replace(/\W+/g, '_')}.csv`; a.click();

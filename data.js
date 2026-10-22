@@ -5,6 +5,8 @@ export const CONFIG = {
   appName: 'AR-FISMA',
   tagline: 'Augmented Reality Fisika SMA',
   versi: '1.0',
+  // URL aplikasi web Google Apps Script (lihat google-sheets/Code.gs). Kosong = hasil kuis tidak dikirim.
+  sheetUrl: '',
   pengembang: [
     { nama: 'Nama Pengembang', peran: 'Pengembang Media', instansi: 'Program Studi / Universitas', email: 'email@kampus.ac.id' },
     { nama: 'Nama Dosen Pembimbing', peran: 'Dosen Pembimbing', instansi: 'Program Studi / Universitas', email: 'email@kampus.ac.id' },
