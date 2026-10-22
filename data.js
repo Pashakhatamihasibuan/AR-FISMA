@@ -6,7 +6,7 @@ export const CONFIG = {
   tagline: 'Augmented Reality Fisika SMA',
   versi: '1.0',
   // URL aplikasi web Google Apps Script (lihat google-sheets/Code.gs). Kosong = hasil kuis tidak dikirim.
-  sheetUrl: '',
+  sheetUrl: 'https://script.google.com/macros/s/AKfycbxMuj22H2wEUAg4fBKhySrIQAX00gIDAOkV9KALGumkqLbJmuCU3LEmxakHxXfL-L1TJw/exec',
   pengembang: [
     { nama: 'Nama Pengembang', peran: 'Pengembang Media', instansi: 'Program Studi / Universitas', email: 'email@kampus.ac.id' },
     { nama: 'Nama Dosen Pembimbing', peran: 'Dosen Pembimbing', instansi: 'Program Studi / Universitas', email: 'email@kampus.ac.id' },
