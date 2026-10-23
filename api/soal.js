@@ -6,7 +6,7 @@ export default (req, res) => jalankan(res, async () => {
   if (req.method !== 'GET') return galat(res, 405, 'Metode tidak didukung.');
   const bab = String(req.query.bab || '');
   const soal = (await store().semua()).filter(s => s.aktif && s.bab === bab)
-    .map(({ id, pertanyaan, a, b, c, d }) => ({ id, pertanyaan, a, b, c, d }));
+    .map(({ id, pertanyaan, a, b, c, d, gambar }) => ({ id, pertanyaan, a, b, c, d, gambar }));
   res.setHeader('Cache-Control', 'no-store');
   res.status(200).json({ ok: true, soal });
 });

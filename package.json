@@ -3,9 +3,14 @@
   "private": true,
   "type": "module",
   "description": "AR-FISMA: media pembelajaran Augmented Reality Fisika SMA",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "node dev-server.mjs",
     "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.8.2"
   }
 }

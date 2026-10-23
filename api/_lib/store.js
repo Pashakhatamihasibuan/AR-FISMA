@@ -5,8 +5,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { SOAL_AWAL } from './soal-awal.js';
 
-const KOLOM_SOAL = ['id', 'bab', 'pertanyaan', 'a', 'b', 'c', 'd', 'jawaban', 'pembahasan', 'aktif', 'diubah'];
-const HEADER_SOAL = ['ID', 'Bab', 'Pertanyaan', 'Opsi A', 'Opsi B', 'Opsi C', 'Opsi D', 'Jawaban', 'Pembahasan', 'Aktif', 'Diubah'];
+// Kolom baru selalu ditambah di kanan supaya baris lama di spreadsheet tetap terbaca.
+const KOLOM_SOAL = ['id', 'bab', 'pertanyaan', 'a', 'b', 'c', 'd', 'jawaban', 'pembahasan', 'aktif', 'diubah', 'gambar'];
+const HEADER_SOAL = ['ID', 'Bab', 'Pertanyaan', 'Opsi A', 'Opsi B', 'Opsi C', 'Opsi D', 'Jawaban', 'Pembahasan', 'Aktif', 'Diubah', 'Gambar (URL)'];
 const HEADER_HASIL = ['Waktu', 'Nama', 'Kelas/Rombel', 'Bab', 'Judul Bab', 'Benar', 'Jumlah Soal', 'Nilai', 'Rincian'];
 
 export const idBaru = () => 's' + Date.now().toString(36) + crypto.randomBytes(3).toString('hex');
@@ -53,24 +54,24 @@ async function siapkanTab() {
   const baru = ['Soal', 'Hasil'].filter(t => !ada.includes(t));
   if (baru.length) await api(':batchUpdate', { method: 'POST', body: JSON.stringify({ requests: baru.map(title => ({ addSheet: { properties: { title, gridProperties: { frozenRowCount: 1 } } } })) }) });
   if (baru.includes('Hasil')) await nilai('Hasil!A1:I1', [HEADER_HASIL]);
-  if (baru.includes('Soal')) await nilai('Soal!A1:K1', [HEADER_SOAL]);
+  await nilai('Soal!A1:L1', [HEADER_SOAL]); // juga menambah judul kolom Gambar pada tab Soal lama
   tabSiap = true;
 }
 
 const sheets = {
   async semua() {
     await siapkanTab();
-    const rows = (await api(`/values/${encodeURIComponent('Soal!A2:K')}`)).values || [];
+    const rows = (await api(`/values/${encodeURIComponent('Soal!A2:L')}`)).values || [];
     if (rows.length) return rows.filter(r => r[0]).map(dariBaris);
     const awal = benih();
-    await nilai('Soal!A2:K', awal.map(keBaris), 'APPEND');
+    await nilai('Soal!A2:L', awal.map(keBaris), 'APPEND');
     return awal;
   },
   async simpan(s) {
     const daftar = await sheets.semua();
     const i = daftar.findIndex(x => x.id === s.id);
-    if (i < 0) await nilai('Soal!A2:K', [keBaris(s)], 'APPEND');
-    else await nilai(`Soal!A${i + 2}:K${i + 2}`, [keBaris(s)]);
+    if (i < 0) await nilai('Soal!A2:L', [keBaris(s)], 'APPEND');
+    else await nilai(`Soal!A${i + 2}:L${i + 2}`, [keBaris(s)]);
   },
   async hapus(id) {
     const daftar = await sheets.semua();
@@ -96,4 +97,16 @@ const lokal = {
 };
 
 export const store = () => (pakaiSheets() ? sheets : lokal);
+
+// Gambar soal: Vercel Blob (env BLOB_READ_WRITE_TOKEN dari store yang terhubung ke project).
+// Tanpa Blob dan tanpa Sheets (pengembangan lokal) gambar disimpan sebagai data URL di db.json.
+export const gambarLokal = () => !env.BLOB_READ_WRITE_TOKEN && !pakaiSheets();
+export async function simpanGambar(jpeg) {
+  if (env.BLOB_READ_WRITE_TOKEN) {
+    const { put } = await import('@vercel/blob');
+    return (await put(`soal/${idBaru()}.jpg`, jpeg, { access: 'public', contentType: 'image/jpeg' })).url;
+  }
+  if (gambarLokal()) return 'data:image/jpeg;base64,' + jpeg.toString('base64');
+  throw new Error('Penyimpanan gambar belum diatur. Buat Blob store di Vercel dan hubungkan ke project ini.');
+}
 export const modeStore = () => (pakaiSheets() ? 'google-sheets' : 'file-lokal');

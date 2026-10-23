@@ -75,3 +75,21 @@ test('guru: tambah, ubah, validasi, dan hapus soal', async () => {
   assert.equal((await panggil(guru, { method: 'POST', token, body: { aksi: 'hapus', id } })).code, 200);
   assert.equal((await panggil(guru, { method: 'POST', token, body: { aksi: 'hapus', id } })).code, 404);
 });
+
+test('guru: unggah gambar soal (mode lokal) dan validasinya', async () => {
+  const token = (await panggil(guru, { method: 'POST', body: { aksi: 'login', password: 'rahasia-uji' } })).data.token;
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200, 1)]).toString('base64');
+  assert.equal((await panggil(guru, { method: 'POST', body: { aksi: 'gambar', data: jpeg } })).code, 401, 'unggah wajib login');
+  assert.equal((await panggil(guru, { method: 'POST', token, body: { aksi: 'gambar', data: Buffer.from('<svg onload=alert(1)>'.repeat(10)).toString('base64') } })).code, 400, 'bukan JPEG ditolak');
+  const up = await panggil(guru, { method: 'POST', token, body: { aksi: 'gambar', data: jpeg } });
+  assert.equal(up.code, 200);
+  assert.match(up.data.url, /^data:image\/jpeg;base64,/);
+
+  const baru = { bab: 'gelombang', pertanyaan: 'Perhatikan grafik gelombang pada gambar berikut?', a: '1', b: '2', c: '3', d: '4', jawaban: 'A', pembahasan: 'Lihat gambar.' };
+  assert.equal((await panggil(guru, { method: 'POST', token, body: { aksi: 'simpan', soal: { ...baru, gambar: 'javascript:alert(1)' } } })).code, 400);
+  assert.equal((await panggil(guru, { method: 'POST', token, body: { aksi: 'simpan', soal: { ...baru, gambar: 'https://contoh.com/a.jpg' } } })).code, 400, 'hanya URL Vercel Blob');
+  const r = await panggil(guru, { method: 'POST', token, body: { aksi: 'simpan', soal: { ...baru, gambar: up.data.url } } });
+  assert.equal(r.code, 200);
+  const publik = (await panggil(soal, { query: { bab: 'gelombang' } })).data.soal.find(s => s.id === r.data.soal.id);
+  assert.equal(publik.gambar, up.data.url);
+});

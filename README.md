@@ -9,7 +9,7 @@ Frontend tanpa build step (HTML + ES module + three.js); backend berupa Vercel F
 - **AR**: potret simulasi diekspor ke GLB untuk WebXR (Chrome Android) / AR Quick Look (iOS). **Mode Kamera** menampilkan simulasi di atas pandangan kamera.
 - **Scan & Marker QR**: kartu QR yang bisa dicetak untuk membuka simulasi.
 - **Kuis per bab**: 5 soal cerita HOTS per bab (165 soal). Benar-salah dan pembahasan baru muncul setelah semua jawaban dikirim; penilaian dilakukan di server dan hasil tercatat di tab **Hasil**.
-- **Mode Guru**: guru masuk dengan kata sandi untuk menambah, mengubah, menonaktifkan, dan menghapus soal (tab **Soal**).
+- **Mode Guru**: guru masuk dengan kata sandi untuk menambah, mengubah, menonaktifkan, dan menghapus soal (tab **Soal**), termasuk mengunggah gambar pendukung soal (diperkecil otomatis, disimpan di Vercel Blob; URL-nya di kolom **Gambar**).
 
 Percepatan gravitasi memakai g = 10 m/s² (konvensi buku SMA).
 
@@ -32,7 +32,8 @@ Buka http://localhost:8766. Tanpa variabel Google, data disimpan di `.data/db.js
    | `GURU_PASSWORD` | kata sandi Mode Guru |
    | `TOKEN_SECRET` | teks acak panjang untuk menandatangani sesi guru (opsional; tanpa ini dipakai `GURU_PASSWORD`) |
 
-4. Deploy ulang setelah variabel diisi. Kamera, AR, dan QR hanya berfungsi lewat HTTPS (domain Vercel sudah HTTPS).
+4. **Gambar soal (Vercel Blob)**: di project Vercel buka tab *Storage → Create → Blob*, beri nama, lalu hubungkan ke project ini. Vercel otomatis menambah variabel `BLOB_READ_WRITE_TOKEN`. Tanpa ini, guru tetap bisa mengelola soal tetapi tidak bisa mengunggah gambar.
+5. Deploy ulang setelah variabel diisi. Kamera, AR, dan QR hanya berfungsi lewat HTTPS (domain Vercel sudah HTTPS).
 
 Catatan keamanan: kunci jawaban tidak pernah dikirim ke browser sebelum kuis dikumpulkan. Siapa pun tetap bisa mengirim jawaban dengan nama apa saja, jadi untuk ujian resmi cocokkan dengan pengawasan di kelas. Ganti `GURU_PASSWORD` jika bocor; sesi guru berlaku 12 jam.
 

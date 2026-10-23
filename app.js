@@ -296,6 +296,9 @@ const terbaik = bab => Number(simpan.get('arfisma-best-' + bab)) || 0;
 const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(v => v[1]);
 const quiz = { name: simpan.get('arfisma-nama') || '', rombel: simpan.get('arfisma-rombel') || '', bab: null, soal: [], jawab: {}, i: 0, hasil: null };
 
+// Gambar soal hanya dari Vercel Blob (https) atau data URL JPEG mode lokal; selain itu tidak dirender.
+const gambarSoal = (url, alt, cls = '') => /^(https:\/\/|data:image\/jpeg;base64,)/.test(url || '') ? `<img class="soal-img ${cls}" src="${esc(url)}" alt="${esc(alt)}" loading="lazy">` : '';
+
 async function api(url, { method = 'GET', body, token } = {}) {
   let r, j;
   try {
@@ -353,6 +356,7 @@ function renderSoal() {
     <div class="row" style="justify-content:space-between;font-weight:800"><span>Soal ${quiz.i + 1} dari ${n}</span><span style="flex:none" class="muted">${belum ? `${belum} belum dijawab` : 'Semua sudah dijawab'}</span></div>
     <nav class="qnav" aria-label="Pindah ke soal">${quiz.soal.map((x, k) => `<button data-ke="${k}" class="${quiz.jawab[x.id] ? 'isi' : ''}" ${k === quiz.i ? 'aria-current="step"' : ''} aria-label="Soal ${k + 1}${quiz.jawab[x.id] ? ', sudah dijawab' : ''}">${k + 1}</button>`).join('')}</nav>
     <h2 id="q-text" tabindex="-1" style="font-family:Nunito;font-size:17px;font-weight:700;line-height:1.55">${esc(s.pertanyaan)}</h2>
+    ${gambarSoal(s.gambar, `Gambar pendukung soal ${quiz.i + 1}`)}
     <div class="opts" role="group" aria-label="Pilihan jawaban">${['A', 'B', 'C', 'D'].map(h => `<button class="opt" data-h="${h}" aria-pressed="${quiz.jawab[s.id] === h}"><span class="key">${h}</span>${esc(s[h.toLowerCase()])}</button>`).join('')}</div>
     <p id="q-err" class="err-text" role="alert"></p>
     <div class="row">
@@ -395,6 +399,7 @@ function renderHasil() {
     <div class="links" style="justify-content:center"><a class="btn small" href="#/bab/${b.id}">Baca materi</a>${SIMS[b.id] ? `<a class="btn small ghost" href="#/sim/${b.id}">Buka simulasi</a>` : ''}<a class="btn small ghost" href="#/kuis">Kuis bab lain</a></div></div>
     <div class="card"><h2>Pembahasan</h2>${h.detail.map((d, i) => `<div class="review">
       <p><b>Soal ${i + 1}.</b> ${esc(d.pertanyaan)}</p>
+      ${gambarSoal(d.gambar, `Gambar pendukung soal ${i + 1}`)}
       <div class="feedback ${d.benar ? 'ok' : 'no'}" style="margin-top:8px"><i class="fa-solid ${d.benar ? 'fa-circle-check' : 'fa-circle-xmark'}" aria-hidden="true"></i> ${d.benar ? 'Benar' : 'Belum tepat'}. Jawabanmu: ${opsi(d, d.pilih)}${d.benar ? '' : `<br>Jawaban benar: ${opsi(d, d.kunci)}`}</div>
       <p class="muted" style="font-size:15px">${esc(d.pembahasan)}</p></div>`).join('')}</div>`;
   $('#q-res').focus();
@@ -465,6 +470,7 @@ function renderBank() {
       <button class="btn accent" id="g-tambah" style="margin-top:12px"><i class="fa-solid fa-plus" aria-hidden="true"></i> Tambah soal</button></div>
     <div class="list">${daftar.length ? daftar.map((s, i) => `<div class="card" style="margin:0">
       <p><b>${i + 1}.</b> ${esc(s.pertanyaan.length > 180 ? s.pertanyaan.slice(0, 180) + '…' : s.pertanyaan)}</p>
+      ${gambarSoal(s.gambar, `Gambar soal ${i + 1}`, 'thumb')}
       <div class="meta" style="margin:8px 0;display:flex;gap:6px;flex-wrap:wrap"><span class="chip k-3d">Kunci ${esc(s.jawaban)}</span>${s.aktif ? '<span class="chip k-X">Aktif</span>' : '<span class="chip" style="background:var(--err-50);color:var(--err)">Nonaktif</span>'}${s.diubah ? `<span class="muted" style="font-size:12px">Diubah ${esc(s.diubah)}</span>` : ''}</div>
       <div class="row"><button class="btn small ghost" data-ubah="${esc(s.id)}"><i class="fa-solid fa-pen" aria-hidden="true"></i> Ubah</button><button class="btn small ghost" data-hapus="${esc(s.id)}"><i class="fa-solid fa-trash" aria-hidden="true"></i> Hapus</button></div></div>`).join('')
       : '<p class="card muted">Belum ada soal untuk bab ini. Tekan <b>Tambah soal</b> untuk membuat.</p>'}</div>`;
@@ -475,12 +481,17 @@ function renderBank() {
 }
 
 function renderEditor(s) {
-  const v = s || { bab: guru.bab, pertanyaan: '', a: '', b: '', c: '', d: '', jawaban: 'A', pembahasan: '', aktif: true };
+  const v = s || { bab: guru.bab, pertanyaan: '', a: '', b: '', c: '', d: '', jawaban: 'A', pembahasan: '', aktif: true, gambar: '' };
+  let gambar = v.gambar || '', mengunggah = false;
   const f = (id, label, val, area) => `<label class="field" for="${id}" style="margin-top:12px">${label}</label>${area ? `<textarea class="input" id="${id}" required>${esc(val)}</textarea>` : `<input class="input" id="${id}" required value="${esc(val)}">`}`;
   $('#guru-body').innerHTML = `<form class="card" id="g-form" novalidate><h2>${s ? 'Ubah soal' : 'Tambah soal'}</h2>
     <label class="field" for="e-bab">Bab</label>
     <select class="input" id="e-bab">${BAB.map(b => `<option value="${b.id}" ${b.id === v.bab ? 'selected' : ''}>${KELAS[b.kelas]} · ${esc(b.judul)}</option>`).join('')}</select>
     ${f('e-tanya', 'Pertanyaan (soal cerita)', v.pertanyaan, true)}
+    <label class="field" for="e-file" style="margin-top:12px">Gambar pendukung (opsional)</label>
+    <div class="gbr-box"><div id="e-gbr"></div>
+      <input type="file" id="e-file" accept="image/*" aria-describedby="e-gbr-info">
+      <p id="e-gbr-info" class="muted" style="font-size:13px;margin-top:6px">JPG/PNG/WebP dari galeri atau kamera. Gambar diperkecil otomatis sebelum diunggah.</p></div>
     ${f('e-a', 'Opsi A', v.a)}${f('e-b', 'Opsi B', v.b)}${f('e-c', 'Opsi C', v.c)}${f('e-d', 'Opsi D', v.d)}
     <label class="field" for="e-kunci" style="margin-top:12px">Kunci jawaban</label>
     <select class="input" id="e-kunci">${['A', 'B', 'C', 'D'].map(h => `<option ${h === v.jawaban ? 'selected' : ''}>${h}</option>`).join('')}</select>
@@ -488,12 +499,29 @@ function renderEditor(s) {
     <label class="row" style="align-items:center;gap:10px;margin-top:14px;font-weight:700"><input type="checkbox" id="e-aktif" ${v.aktif ? 'checked' : ''} style="width:22px;height:22px;flex:none"> Aktif (tampil di kuis siswa)</label>
     <p id="e-err" class="err-text" role="alert"></p>
     <div class="row" style="margin-top:12px"><button type="button" class="btn ghost" id="e-batal">Batal</button><button class="btn accent" id="e-simpan"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Simpan soal</button></div></form>`;
+  const tampilGambar = () => {
+    $('#e-gbr').innerHTML = gambar ? `${gambarSoal(gambar, 'Pratinjau gambar soal')}<button type="button" class="btn small ghost" id="e-gbr-hapus"><i class="fa-solid fa-xmark" aria-hidden="true"></i> Hapus gambar</button>` : '';
+    if (gambar) $('#e-gbr-hapus').onclick = () => { gambar = ''; tampilGambar(); $('#e-file').value = ''; };
+  };
+  tampilGambar();
+  $('#e-file').onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    mengunggah = true; $('#e-simpan').disabled = true; $('#e-err').textContent = ''; $('#e-gbr-info').textContent = 'Mengunggah gambar…';
+    try {
+      gambar = (await api('/api/guru', { method: 'POST', token: guru.token, body: { aksi: 'gambar', data: await kompresGambar(file) } })).url;
+      tampilGambar(); $('#e-gbr-info').textContent = 'Gambar terunggah. Tekan Simpan soal untuk menyimpannya.';
+    } catch (err) {
+      if (err.status === 401) return gagalGuru(err);
+      $('#e-err').textContent = err.message; $('#e-gbr-info').textContent = 'Gagal mengunggah. Pilih gambar lain atau coba lagi.'; e.target.value = '';
+    } finally { mengunggah = false; $('#e-simpan').disabled = false; }
+  };
   $('#e-tanya').focus();
   $('#e-batal').onclick = renderBank;
   $('#g-form').onsubmit = async e => {
     e.preventDefault();
     const soal = { id: s?.id || '', bab: $('#e-bab').value, pertanyaan: $('#e-tanya').value, a: $('#e-a').value, b: $('#e-b').value, c: $('#e-c').value, d: $('#e-d').value,
-      jawaban: $('#e-kunci').value, pembahasan: $('#e-bahas').value, aktif: $('#e-aktif').checked };
+      jawaban: $('#e-kunci').value, pembahasan: $('#e-bahas').value, aktif: $('#e-aktif').checked, gambar };
+    if (mengunggah) return;
     const btn = $('#e-simpan'); btn.disabled = true;
     try {
       const j = await api('/api/guru', { method: 'POST', token: guru.token, body: { aksi: 'simpan', soal } });
@@ -502,6 +530,21 @@ function renderEditor(s) {
       guru.bab = j.soal.bab; renderBank(); toast('Soal tersimpan.');
     } catch (err) { if (err.status === 401) return gagalGuru(err); $('#e-err').textContent = err.message; btn.disabled = false; }
   };
+}
+
+// Perkecil ke sisi terpanjang 1280 px lalu ubah ke JPEG (latar putih untuk PNG transparan); hasil base64 tanpa prefiks.
+async function kompresGambar(file) {
+  if (!file.type.startsWith('image/')) throw new Error('File yang dipilih bukan gambar.');
+  let bmp;
+  try { bmp = await createImageBitmap(file); } catch { throw new Error('Format gambar tidak didukung browser ini. Pakai JPG atau PNG.'); }
+  const k = Math.min(1, 1280 / Math.max(bmp.width, bmp.height)), cv = document.createElement('canvas');
+  cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+  const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.drawImage(bmp, 0, 0, cv.width, cv.height);
+  for (const q of [0.82, 0.65, 0.5]) {
+    const url = cv.toDataURL('image/jpeg', q);
+    if (url.length * 0.75 < 1_400_000) return url.slice(url.indexOf(',') + 1);
+  }
+  throw new Error('Gambar terlalu besar. Pilih gambar dengan ukuran lebih kecil.');
 }
 
 async function hapusSoal(id) {

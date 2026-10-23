@@ -13,7 +13,7 @@ export default (req, res) => jalankan(res, async () => {
 
   const detail = soal.map(s => {
     const pilih = typeof jawaban[s.id] === 'string' ? jawaban[s.id].toUpperCase() : '';
-    return { id: s.id, pertanyaan: s.pertanyaan, opsi: { A: s.a, B: s.b, C: s.c, D: s.d }, pilih, kunci: s.jawaban, benar: pilih === s.jawaban, pembahasan: s.pembahasan };
+    return { id: s.id, pertanyaan: s.pertanyaan, gambar: s.gambar, opsi: { A: s.a, B: s.b, C: s.c, D: s.d }, pilih, kunci: s.jawaban, benar: pilih === s.jawaban, pembahasan: s.pembahasan };
   });
   const benar = detail.filter(d => d.benar).length, nilai = Math.round(benar / detail.length * 100);
   await store().tambahHasil([
