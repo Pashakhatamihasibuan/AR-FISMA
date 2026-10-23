@@ -98,11 +98,13 @@ const lokal = {
 
 export const store = () => (pakaiSheets() ? sheets : lokal);
 
-// Gambar soal: Vercel Blob (env BLOB_READ_WRITE_TOKEN dari store yang terhubung ke project).
+// Gambar soal: Vercel Blob. Store yang terhubung ke project memberi BLOB_STORE_ID (login OIDC otomatis di Vercel)
+// atau BLOB_READ_WRITE_TOKEN (cara lama); @vercel/blob membaca keduanya sendiri.
 // Tanpa Blob dan tanpa Sheets (pengembangan lokal) gambar disimpan sebagai data URL di db.json.
-export const gambarLokal = () => !env.BLOB_READ_WRITE_TOKEN && !pakaiSheets();
+const pakaiBlob = () => Boolean(env.BLOB_STORE_ID || env.BLOB_READ_WRITE_TOKEN);
+export const gambarLokal = () => !pakaiBlob() && !pakaiSheets();
 export async function simpanGambar(jpeg) {
-  if (env.BLOB_READ_WRITE_TOKEN) {
+  if (pakaiBlob()) {
     const { put } = await import('@vercel/blob');
     return (await put(`soal/${idBaru()}.jpg`, jpeg, { access: 'public', contentType: 'image/jpeg' })).url;
   }

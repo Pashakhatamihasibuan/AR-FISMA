@@ -32,7 +32,7 @@ Buka http://localhost:8766. Tanpa variabel Google, data disimpan di `.data/db.js
    | `GURU_PASSWORD` | kata sandi Mode Guru |
    | `TOKEN_SECRET` | teks acak panjang untuk menandatangani sesi guru (opsional; tanpa ini dipakai `GURU_PASSWORD`) |
 
-4. **Gambar soal (Vercel Blob)**: di project Vercel buka tab *Storage → Create → Blob*, beri nama, lalu hubungkan ke project ini. Vercel otomatis menambah variabel `BLOB_READ_WRITE_TOKEN`. Tanpa ini, guru tetap bisa mengelola soal tetapi tidak bisa mengunggah gambar.
+4. **Gambar soal (Vercel Blob)**: di project Vercel buka tab *Storage → Create → Blob*, beri nama, lalu hubungkan ke project ini. Vercel otomatis menambah variabel `BLOB_STORE_ID` (atau `BLOB_READ_WRITE_TOKEN` pada store lama). Tanpa ini, guru tetap bisa mengelola soal tetapi tidak bisa mengunggah gambar.
 5. Deploy ulang setelah variabel diisi. Kamera, AR, dan QR hanya berfungsi lewat HTTPS (domain Vercel sudah HTTPS).
 
 Catatan keamanan: kunci jawaban tidak pernah dikirim ke browser sebelum kuis dikumpulkan. Siapa pun tetap bisa mengirim jawaban dengan nama apa saja, jadi untuk ujian resmi cocokkan dengan pengawasan di kelas. Ganti `GURU_PASSWORD` jika bocor; sesi guru berlaku 12 jam.
