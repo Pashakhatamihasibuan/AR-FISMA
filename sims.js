@@ -419,9 +419,11 @@ sim('usaha-energi', { mode: 'energi-mekanik', label: 'Energi mekanik',
   },
 });
 
-sim('momentum', { mode: 'tumbukan', label: 'Tumbukan',
-  params: [{ k: 'm1', label: 'Massa troli 1', min: 1, max: 5, step: 0.5, val: 2, unit: 'kg', rebuild: true }, { k: 'v1', label: 'Kecepatan troli 1', min: 0, max: 8, step: 0.5, val: 4, unit: 'm/s', rebuild: true },
-    { k: 'm2', label: 'Massa troli 2', min: 1, max: 5, step: 0.5, val: 1, unit: 'kg', rebuild: true }, { k: 'v2', label: 'Kecepatan troli 2', min: -6, max: 4, step: 0.5, val: 0, unit: 'm/s', rebuild: true },
+sim('momentum', { mode: 'tumbukan', label: 'Tumbukan', desc: 'Troli 1 bergerak ke kanan. Troli 2 bisa searah (dikejar) atau berlawanan arah (tabrakan berhadapan). Arah ke kanan dihitung positif, ke kiri negatif.',
+  params: [{ k: 'm1', label: 'Massa troli 1', min: 1, max: 5, step: 0.5, val: 2, unit: 'kg', rebuild: true }, { k: 'v1', label: 'Kelajuan troli 1 (ke kanan)', min: 0, max: 8, step: 0.5, val: 4, unit: 'm/s', rebuild: true },
+    { k: 'm2', label: 'Massa troli 2', min: 1, max: 5, step: 0.5, val: 1, unit: 'kg', rebuild: true },
+    { k: 'arah', label: 'Arah troli 2', opts: [['lawan', 'Berlawanan arah (ke kiri)'], ['searah', 'Searah (ke kanan)']], val: 'lawan', rebuild: true },
+    { k: 'v2', label: 'Kelajuan troli 2', min: 0, max: 8, step: 0.5, val: 2, unit: 'm/s', rebuild: true },
     { k: 'e', label: 'Koefisien restitusi e', min: 0, max: 1, step: 0.05, val: 1, unit: '', rebuild: true }],
   cam: [0, 3, 9], target: [0, 0.4, 0],
   build(T, p) {
@@ -434,23 +436,27 @@ sim('momentum', { mode: 'tumbukan', label: 'Tumbukan',
       return { gr, w, a: T.arrow(c, 0.035) };
     };
     const c1 = mk(p.m1, 0x2563eb), c2 = mk(p.m2, 0xdc2626);
-    const P = p.m1 * p.v1 + p.m2 * p.v2, M = p.m1 + p.m2, will = p.v1 > p.v2;
-    const v1f = will ? (P - p.m2 * p.e * (p.v1 - p.v2)) / M : p.v1, v2f = will ? (P + p.m1 * p.e * (p.v1 - p.v2)) / M : p.v2;
-    let x1 = -4, x2 = 0.5, u1 = p.v1, u2 = p.v2, hit = false, t = 0;
+    const v2 = p.arah === 'lawan' ? -p.v2 : p.v2; // kecepatan bertanda: kanan +, kiri −
+    const P = p.m1 * p.v1 + p.m2 * v2, M = p.m1 + p.m2, will = p.v1 > v2;
+    const v1f = will ? (P - p.m2 * p.e * (p.v1 - v2)) / M : p.v1, v2f = will ? (P + p.m1 * p.e * (p.v1 - v2)) / M : v2;
+    const x2a = p.arah === 'lawan' ? 2.5 : 0.5;
+    let x1 = -4, x2 = x2a, u1 = p.v1, u2 = v2, hit = false, t = 0;
     const ts = 0.6;
     return {
       update(dt) {
         t += dt; const h = dt * ts;
         x1 += u1 * h; x2 += u2 * h;
         if (!hit && x1 + c1.w / 2 >= x2 - c2.w / 2 && u1 > u2) { hit = true; u1 = v1f; u2 = v2f; x1 = x2 - c2.w / 2 - c1.w / 2; }
-        if (t > 9 || Math.abs(x1) > 6 || Math.abs(x2) > 6) { x1 = -4; x2 = 0.5; u1 = p.v1; u2 = p.v2; hit = false; t = 0; }
+        if (t > 9 || Math.abs(x1) > 6 || Math.abs(x2) > 6) { x1 = -4; x2 = x2a; u1 = p.v1; u2 = v2; hit = false; t = 0; }
         c1.gr.position.x = x1; c2.gr.position.x = x2;
         c1.a.set(V(x1, 1.0, 0), V(u1 * 0.15, 0, 0)); c2.a.set(V(x2, 1.0, 0), V(u2 * 0.15, 0, 0));
       },
       readout() {
-        const Ek0 = 0.5 * p.m1 * p.v1 ** 2 + 0.5 * p.m2 * p.v2 ** 2, Ek1 = 0.5 * p.m1 * v1f ** 2 + 0.5 * p.m2 * v2f ** 2;
-        const jenis = !will ? 'Tidak terjadi tumbukan (v₁ ≤ v₂)' : p.e === 1 ? 'Lenting sempurna' : p.e === 0 ? 'Tidak lenting sama sekali' : 'Lenting sebagian';
-        return [['Momentum total', `${fx(P, 2)} kg·m/s (kekal)`], ['v₁′ ; v₂′', `${fx(v1f)} ; ${fx(v2f)} m/s`], ['E_k sebelum', fx(Ek0, 2) + ' J'], ['E_k sesudah', fx(Ek1, 2) + ' J'], ['Jenis tumbukan', jenis]];
+        const Ek0 = 0.5 * p.m1 * p.v1 ** 2 + 0.5 * p.m2 * v2 ** 2, Ek1 = 0.5 * p.m1 * v1f ** 2 + 0.5 * p.m2 * v2f ** 2;
+        const jenis = !will ? 'Tidak terjadi tumbukan (kedua troli tidak saling mendekat)' : p.e === 1 ? 'Lenting sempurna' : p.e === 0 ? 'Tidak lenting sama sekali' : 'Lenting sebagian';
+        const arahnya = v => Math.abs(v) < 0.005 ? 'diam' : v > 0 ? 'ke kanan' : 'ke kiri';
+        return [['Sebelum: v₁ ; v₂', `${fx(p.v1)} ; ${fx(v2)} m/s`], ['Momentum total m₁v₁ + m₂v₂', `${fx(P, 2)} kg·m/s (kekal)`], ['Sesudah: v₁′ ; v₂′', `${fx(v1f)} ; ${fx(v2f)} m/s`],
+          ['Gerak sesudah tumbukan', `troli 1 ${arahnya(v1f)}, troli 2 ${arahnya(v2f)}`], ['E_k sebelum → sesudah', `${fx(Ek0, 2)} J → ${fx(Ek1, 2)} J`], ['Jenis tumbukan', jenis]];
       },
     };
   },

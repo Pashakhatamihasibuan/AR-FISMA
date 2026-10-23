@@ -167,7 +167,7 @@ export const MATERI_X = [
     <h3>Hukum kekekalan momentum dan tumbukan</h3>
     <div class="rumus">m₁v₁ + m₂v₂ = m₁v₁′ + m₂v₂′ &nbsp;&nbsp; e = −(v₁′ − v₂′) / (v₁ − v₂)</div>
     <ul><li><b>Lenting sempurna</b> (e = 1): energi kinetik kekal.</li><li><b>Lenting sebagian</b> (0 &lt; e &lt; 1), misalnya bola memantul: <span class="rumus-inline">e = √(h₂/h₁)</span>.</li><li><b>Tidak lenting sama sekali</b> (e = 0): benda menyatu.</li></ul>
-    ${coba('momentum', 'tumbukan', 'Coba tumbukan troli')}
+    ${coba('momentum', 'tumbukan', 'Coba tumbukan troli (searah &amp; berlawanan arah)')}
     ${tips(['Momentum adalah vektor: beri tanda negatif untuk arah berlawanan.', 'Momentum selalu kekal pada tumbukan, energi kinetik belum tentu.', 'Gunakan Δp = m(v₂ − v₁) dengan tanda arah yang benar saat bola dipantulkan.'])}`,
     contoh: [
       { soal: 'Troli 2 kg (3 m/s) menumbuk troli 1 kg yang diam lalu menyatu. Berapa kecepatan setelah tumbukan?', jawab: 'v′ = (2 × 3)/(2 + 1) = <b>2 m/s</b>.' },
