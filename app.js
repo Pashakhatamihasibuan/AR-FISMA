@@ -2,8 +2,11 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
-import { CONFIG, CP, TP, PANDUAN, KELAS, BAB, KUIS } from './data.js';
+import { CONFIG, CP, TP, PANDUAN, KELAS, BAB } from './data.js';
 import { SIMS, toolkit, fx } from './sims.js';
+import './sims-x.js';
+import './sims-xi.js';
+import './sims-xii.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -19,7 +22,9 @@ function toast(msg) {
 /* =====================================================================
    MESIN SIMULASI 3D
    ===================================================================== */
-const S = { id: null, p: {}, inst: null, group: null, paused: false, speed: 1, labels: true, lastRead: 0 };
+const S = { id: null, mode: null, p: {}, inst: null, group: null, paused: false, speed: 1, labels: true, lastRead: 0 };
+const defMode = () => SIMS[S.id].modes.find(m => m.mode === S.mode) || SIMS[S.id].modes[0];
+const nilaiAwal = d => Object.fromEntries(d.params.map(q => [q.k, q.val]));
 let E = null, stream = null;
 
 function engine() {
@@ -62,13 +67,13 @@ function buildSim() {
   engine();
   if (S.group) { E.scene.remove(S.group); disposeGroup(S.group); }
   S.group = new THREE.Group(); E.scene.add(S.group);
-  S.inst = SIMS[S.id].build(toolkit(S.group), S.p);
+  S.inst = defMode().build(toolkit(S.group), S.p);
   S.inst.update(0, S.p);
   renderReadout();
 }
 // Mundurkan kamera bila isi scene tidak muat (layar HP sempit), tanpa mengubah arah pandang bawaan.
 function resetView() {
-  const d = SIMS[S.id], cam = E.camera, target = new THREE.Vector3(...d.target), pos = new THREE.Vector3(...d.cam);
+  const d = defMode(), cam = E.camera, target = new THREE.Vector3(...d.target), pos = new THREE.Vector3(...d.cam);
   const dir = pos.clone().sub(target), dist0 = dir.length(); dir.normalize();
   const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir).normalize(), up = new THREE.Vector3().crossVectors(dir, right);
   const box = new THREE.Box3();
@@ -90,7 +95,7 @@ function renderReadout() {
 }
 
 function renderControls() {
-  const d = SIMS[S.id];
+  const d = defMode();
   $('#sim-controls').innerHTML = d.params.map(q => q.opts
     ? `<div class="ctrl"><label>${q.label}</label><div class="seg" role="group" aria-label="${q.label}">${q.opts.map(([v, t]) => `<button data-k="${q.k}" data-v="${v}" aria-pressed="${S.p[q.k] === v}">${t}</button>`).join('')}</div></div>`
     : `<div class="ctrl"><label for="c-${q.k}">${q.label}<output id="o-${q.k}">${fx(S.p[q.k], 2)} ${q.unit}</output></label>
@@ -99,27 +104,33 @@ function renderControls() {
 
 $('#sim-controls').addEventListener('input', e => {
   const k = e.target.dataset.k; if (!k) return;
-  const q = SIMS[S.id].params.find(x => x.k === k);
+  const q = defMode().params.find(x => x.k === k);
   S.p[k] = +e.target.value; $(`#o-${k}`).textContent = `${fx(S.p[k], 2)} ${q.unit}`;
   if (q.rebuild) buildSim();
 });
 $('#sim-controls').addEventListener('click', e => {
   const b = e.target.closest('.seg button'); if (!b) return;
-  const q = SIMS[S.id].params.find(x => x.k === b.dataset.k);
+  const q = defMode().params.find(x => x.k === b.dataset.k);
   S.p[q.k] = b.dataset.v;
   b.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
   if (q.rebuild) buildSim();
 });
 
-function enterSim(id) {
+function enterSim(id, modeId) {
   const d = SIMS[id]; if (!d) { location.hash = '#/simulasi'; return; }
-  const b = BY_ID[id];
+  const b = BY_ID[id], m = d.modes.find(x => x.mode === modeId) || d.modes[0];
   $('#sim-title').textContent = b.judul;
-  $('#sim-sub').textContent = `${KELAS[b.kelas]} · simulasi 3D interaktif`;
-  $('#sim-ar').href = `#/ar/${id}`; $('#sim-materi').href = `#/bab/${id}`;
-  if (S.id !== id) { S.id = id; S.p = Object.fromEntries(d.params.map(q => [q.k, q.val])); }
+  $('#sim-sub').textContent = `${KELAS[b.kelas]} · ${m.label}`;
+  $('#sim-ar').href = `#/ar/${id}/${m.mode}`; $('#sim-materi').href = `#/bab/${id}`;
+  if (S.id !== id || S.mode !== m.mode) { S.id = id; S.mode = m.mode; S.p = nilaiAwal(m); }
+  $('#sim-modes-card').hidden = d.modes.length < 2;
+  $('#sim-modes').innerHTML = d.modes.map(x => `<button data-mode="${x.mode}" aria-pressed="${x === m}">${x.label}</button>`).join('');
+  $('#sim-mode-desc').textContent = m.desc || '';
   renderControls(); buildSim(); resetView();
 }
+$('#sim-modes').addEventListener('click', e => {
+  const b = e.target.closest('[data-mode]'); if (b) location.replace(`#/sim/${S.id}/${b.dataset.mode}`);
+});
 
 function bindSimTools() {
   $('#t-play').addEventListener('click', e => {
@@ -163,12 +174,13 @@ function stopCam() {
    AR — potret simulasi diekspor ke GLB untuk model-viewer
    ===================================================================== */
 let arUrl = null;
-async function enterAR(id) {
+async function enterAR(id, modeId) {
   if (!SIMS[id]) { location.hash = '#/simulasi'; return; }
-  $('#ar-sub').textContent = BY_ID[id].judul;
+  const m = SIMS[id].modes.find(x => x.mode === modeId) || SIMS[id].modes[0];
+  $('#ar-sub').textContent = `${BY_ID[id].judul} · ${m.label}`;
   $('#ar-status').textContent = 'Menyiapkan model…';
-  if (S.id !== id) { S.id = id; S.p = Object.fromEntries(SIMS[id].params.map(q => [q.k, q.val])); }
-  if (!S.group || S.group.userData.id !== id) { buildSim(); S.group.userData.id = id; for (let i = 0; i < 60; i++) S.inst.update(1 / 30, S.p); }
+  if (S.id !== id || S.mode !== m.mode) { S.id = id; S.mode = m.mode; S.p = nilaiAwal(m); }
+  if (!S.group || S.group.userData.key !== id + m.mode) { buildSim(); S.group.userData.key = id + m.mode; for (let i = 0; i < 60; i++) S.inst.update(1 / 30, S.p); }
   const snap = S.group.clone(true);
   const css = []; snap.traverse(o => { if (o.isCSS2DObject) css.push(o); });
   css.forEach(o => o.removeFromParent());
@@ -217,8 +229,10 @@ function enterBab(id) {
   $('#bab-actions').innerHTML = SIMS[id]
     ? `<a class="btn accent" href="#/sim/${id}"><i class="fa-solid fa-cube" aria-hidden="true"></i> Simulasi 3D</a><a class="btn ghost" href="#/ar/${id}"><i class="fa-solid fa-vr-cardboard" aria-hidden="true"></i> Lihat di AR</a>`
     : '<p class="muted" style="font-size:14px">Bab ini berupa materi bacaan tanpa simulasi 3D.</p>';
+  $('#bab-actions').insertAdjacentHTML('beforeend', `<a class="btn ghost" href="#/kuis/${id}"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Kuis bab ini</a>`);
   $('#bab-body').innerHTML = b.isi.replace(/<table/g, '<div class="table-wrap"><table').replace(/<\/table>/g, '</table></div>');
-  $('#bab-contoh').innerHTML = `<h2><i class="fa-solid fa-pencil" aria-hidden="true" style="color:var(--accent)"></i> Contoh soal</h2><p>${b.contoh.soal}</p><details><summary>Lihat pembahasan</summary><p style="margin-top:6px">${b.contoh.jawab}</p></details>`;
+  $('#bab-contoh').innerHTML = `<h2><i class="fa-solid fa-pencil" aria-hidden="true" style="color:var(--accent)"></i> Contoh soal</h2>` +
+    b.contoh.map((c, i) => `<div class="review"><p><b>Contoh ${i + 1}.</b> ${c.soal}</p><details><summary>Lihat pembahasan</summary><p style="margin-top:6px">${c.jawab}</p></details></div>`).join('');
   const prev = BAB[k - 1], next = BAB[k + 1];
   $('#bab-pager').innerHTML = `${prev ? `<a class="btn small ghost" href="#/bab/${prev.id}"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> Sebelumnya</a>` : '<span></span>'}
     ${next ? `<a class="btn small" href="#/bab/${next.id}">Berikutnya <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>` : '<a class="btn small accent" href="#/kuis">Kerjakan kuis</a>'}`;
@@ -272,97 +286,230 @@ function enterMarker() {
 }
 
 /* =====================================================================
-   KUIS
+   KUIS PER BAB — kunci & pembahasan hanya dikirim server setelah jawaban dikumpulkan
    ===================================================================== */
-const quiz = { name: '', rombel: '', kelas: 'X', qs: [], i: 0, score: 0, log: [], answered: false };
-const best = {
-  get(k) { try { return +localStorage.getItem('arfisma-best-' + k) || 0; } catch { return 0; } },
-  set(k, v) { try { localStorage.setItem('arfisma-best-' + k, v); } catch { /* storage diblokir */ } },
+const simpan = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* storage diblokir */ } },
 };
+const terbaik = bab => Number(simpan.get('arfisma-best-' + bab)) || 0;
 const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(v => v[1]);
+const quiz = { name: simpan.get('arfisma-nama') || '', rombel: simpan.get('arfisma-rombel') || '', bab: null, soal: [], jawab: {}, i: 0, hasil: null };
 
-// Identitas siswa + pengiriman hasil ke Google Sheets guru (CONFIG.sheetUrl kosong = pengiriman nonaktif).
-const identitasHTML = () => `<label class="field" for="q-name" style="margin-top:12px">Nama lengkap</label><input class="input" id="q-name" autocomplete="name" placeholder="Nama lengkap" value="${esc(quiz.name)}" aria-describedby="q-err">
-    <label class="field" for="q-rombel" style="margin-top:12px">Kelas/rombel</label><input class="input" id="q-rombel" placeholder="Contoh: X IPA 1" value="${esc(quiz.rombel)}">
-    <p id="q-err" role="alert" style="color:var(--err);font-weight:700;font-size:14px;margin-top:6px"></p>
-    ${CONFIG.sheetUrl ? '<p class="muted" style="font-size:13px"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Nama, kelas/rombel, dan nilai kuismu akan dikirim ke spreadsheet guru.</p>' : ''}`;
-function bacaIdentitas() {
-  quiz.name = $('#q-name').value.trim(); quiz.rombel = $('#q-rombel').value.trim();
-  if (CONFIG.sheetUrl && !quiz.name) { $('#q-err').textContent = 'Isi nama lengkap dulu agar hasilmu tercatat.'; $('#q-name').focus(); return false; }
-  quiz.name ||= 'Siswa';
-  return true;
-}
-async function kirimKeGuru(kuis, n) {
-  const el = $('#q-send'); if (!CONFIG.sheetUrl || !el) return;
-  el.textContent = 'Mengirim hasil ke guru…';
-  let ok = false;
+async function api(url, { method = 'GET', body, token } = {}) {
+  let r, j;
   try {
-    // body teks biasa = "simple request", tidak memicu preflight CORS yang ditolak Apps Script
-    const r = await fetch(CONFIG.sheetUrl, { method: 'POST', body: JSON.stringify({ app: CONFIG.appName, nama: quiz.name, rombel: quiz.rombel, kuis, benar: quiz.score, jumlah: n,
-      rincian: quiz.log.map((l, i) => `${i + 1}. ${l.ok ? '✓' : '✗'} ${l.q.slice(0, 60)}`).join(' | ') }) });
-    ok = (await r.json()).ok === true;
-  } catch { ok = false; }
-  if (!el.isConnected) return;
-  el.innerHTML = ok ? '<i class="fa-solid fa-circle-check" aria-hidden="true" style="color:var(--ok)"></i> Hasil sudah tercatat di spreadsheet guru.'
-    : 'Gagal mengirim hasil ke guru (periksa koneksi internet). <button class="btn small ghost" id="q-resend">Kirim ulang</button>';
-  if (!ok) $('#q-resend').onclick = () => kirimKeGuru(kuis, n);
+    r = await fetch(url, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body && JSON.stringify(body) });
+    j = await r.json();
+  } catch { throw Object.assign(new Error('Server tidak dapat dihubungi. Periksa internet, lalu coba lagi.'), { status: 0 }); }
+  if (!r.ok || !j.ok) throw Object.assign(new Error(j.error || 'Terjadi kesalahan.'), { status: r.status });
+  return j;
 }
 
-function enterKuis() {
-  $('#kuis-body').innerHTML = `<div class="card"><h2>Pilih kelas</h2>
-    <div class="seg" role="group" aria-label="Kelas kuis" id="q-kelas">${Object.entries(KELAS).map(([k, t]) => `<button data-q="${k}" aria-pressed="${quiz.kelas === k}">${t} · ${KUIS[k].length} soal</button>`).join('')}</div>
-    <p class="muted" id="q-best" style="margin-top:10px;font-size:14px"></p>
-    ${identitasHTML()}
-    <button class="btn accent" id="q-start" style="margin-top:14px"><i class="fa-solid fa-play" aria-hidden="true"></i> Mulai kuis</button></div>`;
-  const showBest = () => { const b = best.get(quiz.kelas); $('#q-best').textContent = b ? `Nilai terbaikmu di ${KELAS[quiz.kelas]}: ${b}` : 'Soal diacak dan setiap jawaban dilengkapi pembahasan.'; };
-  showBest();
-  $('#q-kelas').onclick = e => { const b = e.target.closest('button'); if (!b) return; quiz.kelas = b.dataset.q; document.querySelectorAll('#q-kelas button').forEach(x => x.setAttribute('aria-pressed', x === b)); showBest(); };
-  $('#q-start').onclick = () => { if (!bacaIdentitas()) return; quiz.qs = shuffle(KUIS[quiz.kelas]); quiz.i = 0; quiz.score = 0; quiz.log = []; renderQ(); };
+function enterKuis(babId) {
+  if (!babId) return renderDaftarKuis();
+  const b = BY_ID[babId]; if (!b) { location.hash = '#/kuis'; return; }
+  $('#kuis-title').textContent = 'Kuis: ' + b.judul;
+  if (quiz.bab === babId && quiz.soal.length && !quiz.hasil) return renderSoal(); // lanjutkan yang belum dikirim
+  Object.assign(quiz, { bab: babId, soal: [], jawab: {}, i: 0, hasil: null });
+  const t = terbaik(babId);
+  $('#kuis-body').innerHTML = `<div class="card"><h2>${esc(b.judul)}</h2>
+    <p>5 soal cerita yang menuntut analisis. Jawabanmu <b>tidak dinilai satu per satu</b>: benar-salah dan pembahasan baru muncul setelah semua jawaban dikirim.</p>
+    <p class="muted" style="margin-top:6px;font-size:14px">${t ? `Nilai terbaikmu di bab ini: <b>${t}</b>` : 'Kamu belum pernah mengerjakan kuis bab ini.'}</p>
+    <form id="q-form" novalidate>
+      <label class="field" for="q-name" style="margin-top:12px">Nama lengkap</label><input class="input" id="q-name" autocomplete="name" required value="${esc(quiz.name)}" aria-describedby="q-err">
+      <label class="field" for="q-rombel" style="margin-top:12px">Kelas/rombel</label><input class="input" id="q-rombel" placeholder="Contoh: X IPA 1" value="${esc(quiz.rombel)}">
+      <p id="q-err" class="err-text" role="alert"></p>
+      <p class="muted" style="font-size:13px"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Nama, kelas/rombel, dan nilaimu tercatat untuk guru.</p>
+      <button class="btn accent" id="q-start" style="margin-top:14px"><i class="fa-solid fa-play" aria-hidden="true"></i> Mulai kuis</button>
+    </form></div>`;
+  $('#q-form').onsubmit = async e => {
+    e.preventDefault();
+    quiz.name = $('#q-name').value.trim(); quiz.rombel = $('#q-rombel').value.trim();
+    if (!quiz.name) { $('#q-err').textContent = 'Isi nama lengkap dulu agar hasilmu tercatat.'; $('#q-name').focus(); return; }
+    simpan.set('arfisma-nama', quiz.name); simpan.set('arfisma-rombel', quiz.rombel);
+    const btn = $('#q-start'); btn.disabled = true; btn.textContent = 'Memuat soal…';
+    try {
+      quiz.soal = shuffle((await api(`/api/soal?bab=${encodeURIComponent(babId)}`)).soal);
+      if (!quiz.soal.length) throw new Error('Belum ada soal untuk bab ini.');
+      renderSoal();
+    } catch (err) { $('#q-err').textContent = err.message; btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-play" aria-hidden="true"></i> Coba lagi'; }
+  };
 }
-function renderQ() {
-  const q = quiz.qs[quiz.i], n = quiz.qs.length; quiz.answered = false;
-  $('#kuis-body').innerHTML = `<div class="card"><div class="row" style="justify-content:space-between;font-weight:800"><span>${KELAS[quiz.kelas]} · Soal ${quiz.i + 1}/${n}</span><span style="flex:none">Benar: ${quiz.score}</span></div>
-    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="${n}" aria-valuenow="${quiz.i}"><div style="width:${quiz.i / n * 100}%"></div></div>
-    <h2 id="q-text" tabindex="-1">${q.q}</h2>
-    <div class="opts">${q.o.map((o, k) => `<button class="opt" data-k="${k}"><span class="key">${'ABCD'[k]}</span>${o}</button>`).join('')}</div>
-    <div id="q-fb" aria-live="polite"></div></div>`;
-  $('#q-text').focus();
-  document.querySelectorAll('.opt').forEach(btn => { btn.onclick = () => answer(+btn.dataset.k); });
+
+function renderDaftarKuis() {
+  $('#kuis-title').textContent = 'Kuis per Bab';
+  $('#kuis-body').innerHTML = `<p class="muted" style="margin-bottom:12px">Setiap bab berisi 5 soal cerita HOTS. Hasil dan pembahasan ditampilkan setelah semua jawaban dikirim.</p>` +
+    Object.entries(KELAS).map(([k, t]) => `<h2 class="group-title">${t}</h2><div class="list">${BAB.filter(b => b.kelas === k).map(b => {
+      const n = terbaik(b.id);
+      return `<a class="item" href="#/kuis/${b.id}"><span class="badge"><i class="fa-solid ${b.ikon}" aria-hidden="true"></i></span>
+        <div><h3>${b.judul}</h3><div class="meta">${n ? `<span class="chip k-${k}">Nilai terbaik ${n}</span>` : 'Belum dikerjakan'}</div></div><i class="fa-solid fa-chevron-right chev" aria-hidden="true"></i></a>`;
+    }).join('')}</div>`).join('');
 }
-function answer(k) {
-  if (quiz.answered) return; quiz.answered = true;
-  const q = quiz.qs[quiz.i], ok = k === q.ans; if (ok) quiz.score++;
-  quiz.log.push({ q: q.q, jawab: q.o[k], benar: q.o[q.ans], ok });
-  document.querySelectorAll('.opt').forEach((b, i) => { b.disabled = true; if (i === q.ans) b.classList.add('right'); else if (i === k) b.classList.add('wrong'); });
-  const last = quiz.i === quiz.qs.length - 1;
-  $('#q-fb').innerHTML = `<div class="feedback ${ok ? 'ok' : 'no'}"><i class="fa-solid ${ok ? 'fa-circle-check' : 'fa-circle-xmark'}" aria-hidden="true"></i> ${ok ? 'Benar!' : 'Belum tepat.'} ${q.ex}</div>
-    <button class="btn" id="q-next">${last ? 'Lihat hasil' : 'Soal berikutnya'} <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>`;
-  $('#q-next').onclick = () => { if (last) result(); else { quiz.i++; renderQ(); } };
-  $('#q-next').focus();
+
+function renderSoal() {
+  const n = quiz.soal.length, s = quiz.soal[quiz.i], belum = quiz.soal.filter(x => !quiz.jawab[x.id]).length, akhir = quiz.i === n - 1;
+  $('#kuis-body').innerHTML = `<div class="card">
+    <div class="row" style="justify-content:space-between;font-weight:800"><span>Soal ${quiz.i + 1} dari ${n}</span><span style="flex:none" class="muted">${belum ? `${belum} belum dijawab` : 'Semua sudah dijawab'}</span></div>
+    <nav class="qnav" aria-label="Pindah ke soal">${quiz.soal.map((x, k) => `<button data-ke="${k}" class="${quiz.jawab[x.id] ? 'isi' : ''}" ${k === quiz.i ? 'aria-current="step"' : ''} aria-label="Soal ${k + 1}${quiz.jawab[x.id] ? ', sudah dijawab' : ''}">${k + 1}</button>`).join('')}</nav>
+    <h2 id="q-text" tabindex="-1" style="font-family:Nunito;font-size:17px;font-weight:700;line-height:1.55">${esc(s.pertanyaan)}</h2>
+    <div class="opts" role="group" aria-label="Pilihan jawaban">${['A', 'B', 'C', 'D'].map(h => `<button class="opt" data-h="${h}" aria-pressed="${quiz.jawab[s.id] === h}"><span class="key">${h}</span>${esc(s[h.toLowerCase()])}</button>`).join('')}</div>
+    <p id="q-err" class="err-text" role="alert"></p>
+    <div class="row">
+      <button class="btn ghost" id="q-prev" ${quiz.i === 0 ? 'disabled' : ''}><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Sebelumnya</button>
+      ${akhir ? `<button class="btn accent" id="q-kirim"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Kirim jawaban</button>`
+        : `<button class="btn" id="q-next">Berikutnya <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>`}
+    </div>
+    ${akhir ? '' : `<button class="btn ghost" id="q-kirim" style="margin-top:12px">Kirim jawaban sekarang</button>`}</div>`;
+  $('#q-text').focus({ preventScroll: true });
+  document.querySelectorAll('.opt').forEach(b => { b.onclick = () => { quiz.jawab[s.id] = b.dataset.h; renderSoal(); $(`.opt[data-h="${b.dataset.h}"]`).focus(); }; });
+  document.querySelectorAll('.qnav button').forEach(b => { b.onclick = () => { quiz.i = +b.dataset.ke; renderSoal(); }; });
+  $('#q-prev').onclick = () => { quiz.i--; renderSoal(); };
+  if (!akhir) $('#q-next').onclick = () => { quiz.i++; renderSoal(); };
+  $('#q-kirim').onclick = kirimJawaban;
 }
-function result() {
-  const n = quiz.qs.length, nilai = Math.round(quiz.score / n * 100);
-  if (nilai > best.get(quiz.kelas)) best.set(quiz.kelas, nilai);
-  const C = 2 * Math.PI * 54, msg = nilai >= 80 ? 'Luar biasa! Pemahamanmu sangat baik.' : nilai >= 60 ? 'Bagus! Pelajari lagi pembahasan soal yang salah.' : 'Ayo ulangi materi dan simulasinya, lalu coba lagi.';
-  $('#kuis-body').innerHTML = `<div class="card" style="text-align:center"><h2 tabindex="-1" id="q-res">Hasil kuis ${KELAS[quiz.kelas]}, ${esc(quiz.name)}</h2>
-    <svg class="score-ring" viewBox="0 0 140 140" role="img" aria-label="Nilai ${nilai} dari 100"><circle cx="70" cy="70" r="54" fill="none" stroke="var(--primary-100)" stroke-width="14"/>
-      <circle cx="70" cy="70" r="54" fill="none" stroke="${nilai >= 60 ? 'var(--ok)' : 'var(--accent)'}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${C * nilai / 100} ${C}" transform="rotate(-90 70 70)"/>
-      <text x="70" y="80" text-anchor="middle" font-family="Baloo 2" font-weight="800" font-size="34" fill="var(--fg)">${nilai}</text></svg>
-    <p><b>${quiz.score}</b> dari ${n} jawaban benar. ${msg}</p>
-    <p id="q-send" class="muted" aria-live="polite" style="font-size:14px;margin-top:6px"></p>
-    <div class="row" style="margin-top:14px"><button class="btn accent" id="q-csv"><i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i> Unduh hasil</button><button class="btn ghost" id="q-again"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Ulangi</button></div></div>
-    <div class="card"><h2>Pembahasan</h2><ol class="prose" style="padding-left:20px">${quiz.log.map(l => `<li style="margin-bottom:8px">${l.q}<br><span style="color:${l.ok ? 'var(--ok)' : 'var(--err)'};font-weight:700">${l.ok ? '✓' : '✗'} ${l.jawab}</span>${l.ok ? '' : `<br><span class="muted">Jawaban benar: <b>${l.benar}</b></span>`}</li>`).join('')}</ol></div>`;
+
+async function kirimJawaban() {
+  const belum = quiz.soal.filter(x => !quiz.jawab[x.id]).length;
+  if (belum && !confirm(`Masih ada ${belum} soal yang belum dijawab dan akan dihitung salah. Tetap kirim?`)) return;
+  const btn = $('#q-kirim'); btn.disabled = true; btn.textContent = 'Mengirim…';
+  try {
+    quiz.hasil = await api('/api/kuis', { method: 'POST', body: { bab: quiz.bab, judul: BY_ID[quiz.bab].judul, nama: quiz.name, rombel: quiz.rombel, jawaban: quiz.jawab } });
+    if (quiz.hasil.nilai > terbaik(quiz.bab)) simpan.set('arfisma-best-' + quiz.bab, quiz.hasil.nilai);
+    renderHasil();
+  } catch (err) { $('#q-err').textContent = err.message + ' Jawabanmu masih tersimpan di layar ini.'; btn.disabled = false; btn.textContent = 'Kirim ulang'; }
+}
+
+function renderHasil() {
+  const h = quiz.hasil, b = BY_ID[quiz.bab], C = 2 * Math.PI * 54;
+  const msg = h.nilai >= 80 ? 'Luar biasa! Pemahamanmu sangat baik.' : h.nilai >= 60 ? 'Bagus! Pelajari pembahasan soal yang salah.' : 'Ayo pelajari lagi materi dan simulasinya, lalu coba lagi.';
+  const opsi = (d, k) => k ? `${k}. ${esc(d.opsi[k])}` : 'Tidak dijawab';
+  $('#kuis-body').innerHTML = `<div class="card" style="text-align:center"><h2 tabindex="-1" id="q-res">Hasil kuis ${esc(b.judul)}</h2>
+    <p class="muted">${esc(quiz.name)}${quiz.rombel ? ' · ' + esc(quiz.rombel) : ''}</p>
+    <svg class="score-ring" viewBox="0 0 140 140" role="img" aria-label="Nilai ${h.nilai} dari 100"><circle cx="70" cy="70" r="54" fill="none" stroke="var(--primary-100)" stroke-width="14"/>
+      <circle cx="70" cy="70" r="54" fill="none" stroke="${h.nilai >= 60 ? 'var(--ok)' : 'var(--accent)'}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${C * h.nilai / 100} ${C}" transform="rotate(-90 70 70)"/>
+      <text x="70" y="80" text-anchor="middle" font-family="Baloo 2" font-weight="800" font-size="34" fill="var(--fg)">${h.nilai}</text></svg>
+    <p><b>${h.benar}</b> dari ${h.jumlah} jawaban benar. ${msg}</p>
+    <p class="muted" style="font-size:14px;margin-top:6px"><i class="fa-solid fa-circle-check" aria-hidden="true" style="color:var(--ok)"></i> Hasilmu sudah tercatat untuk guru.</p>
+    <div class="row" style="margin-top:14px"><button class="btn ghost" id="q-again"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Ulangi</button><button class="btn ghost" id="q-csv"><i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i> Unduh hasil</button></div>
+    <div class="links" style="justify-content:center"><a class="btn small" href="#/bab/${b.id}">Baca materi</a>${SIMS[b.id] ? `<a class="btn small ghost" href="#/sim/${b.id}">Buka simulasi</a>` : ''}<a class="btn small ghost" href="#/kuis">Kuis bab lain</a></div></div>
+    <div class="card"><h2>Pembahasan</h2>${h.detail.map((d, i) => `<div class="review">
+      <p><b>Soal ${i + 1}.</b> ${esc(d.pertanyaan)}</p>
+      <div class="feedback ${d.benar ? 'ok' : 'no'}" style="margin-top:8px"><i class="fa-solid ${d.benar ? 'fa-circle-check' : 'fa-circle-xmark'}" aria-hidden="true"></i> ${d.benar ? 'Benar' : 'Belum tepat'}. Jawabanmu: ${opsi(d, d.pilih)}${d.benar ? '' : `<br>Jawaban benar: ${opsi(d, d.kunci)}`}</div>
+      <p class="muted" style="font-size:15px">${esc(d.pembahasan)}</p></div>`).join('')}</div>`;
   $('#q-res').focus();
-  kirimKeGuru(KELAS[quiz.kelas], n);
-  $('#q-again').onclick = enterKuis;
+  $('#q-again').onclick = () => { quiz.bab = null; enterKuis(b.id); };
   $('#q-csv').onclick = () => {
     const cell = v => `"${String(v).replace(/"/g, '""')}"`;
-    const rows = [['Nama', 'Rombel', 'Kuis', 'Tanggal', 'Benar', 'Jumlah Soal', 'Nilai'].map(cell).join(','), [quiz.name, quiz.rombel, KELAS[quiz.kelas], new Date().toLocaleString('id-ID'), quiz.score, n, nilai].map(cell).join(','), '',
-      ['No', 'Soal', 'Jawaban', 'Kunci', 'Status'].map(cell).join(','), ...quiz.log.map((l, i) => [i + 1, l.q, l.jawab, l.benar, l.ok ? 'Benar' : 'Salah'].map(cell).join(','))];
+    const rows = [['Nama', 'Rombel', 'Bab', 'Tanggal', 'Benar', 'Jumlah Soal', 'Nilai'].map(cell).join(','), [quiz.name, quiz.rombel, b.judul, new Date().toLocaleString('id-ID'), h.benar, h.jumlah, h.nilai].map(cell).join(','), '',
+      ['No', 'Soal', 'Jawabanmu', 'Kunci', 'Status'].map(cell).join(','), ...h.detail.map((d, i) => [i + 1, d.pertanyaan, d.pilih || '-', d.kunci, d.benar ? 'Benar' : 'Salah'].map(cell).join(','))];
     const url = URL.createObjectURL(new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a'); a.href = url; a.download = `hasil-kuis-fisika-${quiz.kelas}-${quiz.name.replace(/\W+/g, '_')}.csv`; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = `hasil-kuis-${b.id}-${quiz.name.replace(/\W+/g, '_')}.csv`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
+}
+
+/* =====================================================================
+   MODE GURU — satu kata sandi (GURU_PASSWORD di Vercel), token disimpan per tab browser
+   ===================================================================== */
+const sesi = {
+  get() { try { return sessionStorage.getItem('arfisma-guru') || ''; } catch { return ''; } },
+  set(v) { try { v ? sessionStorage.setItem('arfisma-guru', v) : sessionStorage.removeItem('arfisma-guru'); } catch { /* storage diblokir */ } },
+};
+const guru = { token: sesi.get(), soal: [], bab: BAB[0].id, penyimpanan: '' };
+
+function enterGuru() { guru.token ? muatBank() : renderLogin(); }
+
+function renderLogin(pesan = '') {
+  $('#guru-keluar').hidden = true;
+  $('#guru-body').innerHTML = `<div class="card"><h2>Masuk sebagai guru</h2>
+    <p class="muted" style="font-size:14px">Halaman ini untuk guru yang mengelola soal kuis. Siswa tidak memerlukan kata sandi.</p>
+    <form id="g-login" novalidate>
+      <label class="field" for="g-pass" style="margin-top:12px">Kata sandi guru</label>
+      <input class="input" id="g-pass" type="password" autocomplete="current-password" required aria-describedby="g-err">
+      <p id="g-err" class="err-text" role="alert">${esc(pesan)}</p>
+      <button class="btn accent" id="g-masuk" style="margin-top:12px"><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> Masuk</button>
+    </form></div>`;
+  $('#g-login').onsubmit = async e => {
+    e.preventDefault();
+    const btn = $('#g-masuk'); btn.disabled = true;
+    try {
+      guru.token = (await api('/api/guru', { method: 'POST', body: { aksi: 'login', password: $('#g-pass').value } })).token;
+      sesi.set(guru.token); muatBank();
+    } catch (err) { $('#g-err').textContent = err.message; btn.disabled = false; $('#g-pass').focus(); }
+  };
+}
+
+async function muatBank() {
+  $('#guru-keluar').hidden = false;
+  $('#guru-body').innerHTML = '<p class="card muted" aria-live="polite">Memuat bank soal…</p>';
+  try {
+    const j = await api('/api/guru', { token: guru.token });
+    guru.soal = j.soal; guru.penyimpanan = j.penyimpanan; renderBank();
+  } catch (err) { gagalGuru(err); }
+}
+function gagalGuru(err) {
+  if (err.status === 401) { guru.token = ''; sesi.set(''); return renderLogin(err.message); }
+  $('#guru-body').innerHTML = `<div class="card"><p class="err-text" role="alert">${esc(err.message)}</p><button class="btn" id="g-ulang" style="margin-top:12px">Coba lagi</button></div>`;
+  $('#g-ulang').onclick = muatBank;
+}
+
+function renderBank() {
+  const daftar = guru.soal.filter(s => s.bab === guru.bab), aktif = daftar.filter(s => s.aktif).length;
+  $('#guru-body').innerHTML = `
+    ${guru.penyimpanan === 'file-lokal' ? '<p class="card err-text" role="status">Mode uji: perubahan disimpan di file lokal, belum ke Google Sheets.</p>' : ''}
+    <div class="card"><h2>Bank soal</h2>
+      <label class="field" for="g-bab">Bab</label>
+      <select class="input" id="g-bab">${Object.entries(KELAS).map(([k, t]) => `<optgroup label="${t}">${BAB.filter(b => b.kelas === k).map(b => `<option value="${b.id}" ${b.id === guru.bab ? 'selected' : ''}>${esc(b.judul)} (${guru.soal.filter(s => s.bab === b.id && s.aktif).length})</option>`).join('')}</optgroup>`).join('')}</select>
+      <p class="muted" style="font-size:14px;margin-top:8px">${aktif} soal aktif tampil di kuis siswa${daftar.length > aktif ? `, ${daftar.length - aktif} nonaktif` : ''}.</p>
+      <button class="btn accent" id="g-tambah" style="margin-top:12px"><i class="fa-solid fa-plus" aria-hidden="true"></i> Tambah soal</button></div>
+    <div class="list">${daftar.length ? daftar.map((s, i) => `<div class="card" style="margin:0">
+      <p><b>${i + 1}.</b> ${esc(s.pertanyaan.length > 180 ? s.pertanyaan.slice(0, 180) + '…' : s.pertanyaan)}</p>
+      <div class="meta" style="margin:8px 0;display:flex;gap:6px;flex-wrap:wrap"><span class="chip k-3d">Kunci ${esc(s.jawaban)}</span>${s.aktif ? '<span class="chip k-X">Aktif</span>' : '<span class="chip" style="background:var(--err-50);color:var(--err)">Nonaktif</span>'}${s.diubah ? `<span class="muted" style="font-size:12px">Diubah ${esc(s.diubah)}</span>` : ''}</div>
+      <div class="row"><button class="btn small ghost" data-ubah="${esc(s.id)}"><i class="fa-solid fa-pen" aria-hidden="true"></i> Ubah</button><button class="btn small ghost" data-hapus="${esc(s.id)}"><i class="fa-solid fa-trash" aria-hidden="true"></i> Hapus</button></div></div>`).join('')
+      : '<p class="card muted">Belum ada soal untuk bab ini. Tekan <b>Tambah soal</b> untuk membuat.</p>'}</div>`;
+  $('#g-bab').onchange = e => { guru.bab = e.target.value; renderBank(); };
+  $('#g-tambah').onclick = () => renderEditor(null);
+  document.querySelectorAll('[data-ubah]').forEach(b => { b.onclick = () => renderEditor(guru.soal.find(s => s.id === b.dataset.ubah)); });
+  document.querySelectorAll('[data-hapus]').forEach(b => { b.onclick = () => hapusSoal(b.dataset.hapus); });
+}
+
+function renderEditor(s) {
+  const v = s || { bab: guru.bab, pertanyaan: '', a: '', b: '', c: '', d: '', jawaban: 'A', pembahasan: '', aktif: true };
+  const f = (id, label, val, area) => `<label class="field" for="${id}" style="margin-top:12px">${label}</label>${area ? `<textarea class="input" id="${id}" required>${esc(val)}</textarea>` : `<input class="input" id="${id}" required value="${esc(val)}">`}`;
+  $('#guru-body').innerHTML = `<form class="card" id="g-form" novalidate><h2>${s ? 'Ubah soal' : 'Tambah soal'}</h2>
+    <label class="field" for="e-bab">Bab</label>
+    <select class="input" id="e-bab">${BAB.map(b => `<option value="${b.id}" ${b.id === v.bab ? 'selected' : ''}>${KELAS[b.kelas]} · ${esc(b.judul)}</option>`).join('')}</select>
+    ${f('e-tanya', 'Pertanyaan (soal cerita)', v.pertanyaan, true)}
+    ${f('e-a', 'Opsi A', v.a)}${f('e-b', 'Opsi B', v.b)}${f('e-c', 'Opsi C', v.c)}${f('e-d', 'Opsi D', v.d)}
+    <label class="field" for="e-kunci" style="margin-top:12px">Kunci jawaban</label>
+    <select class="input" id="e-kunci">${['A', 'B', 'C', 'D'].map(h => `<option ${h === v.jawaban ? 'selected' : ''}>${h}</option>`).join('')}</select>
+    ${f('e-bahas', 'Pembahasan (ditampilkan ke siswa setelah kuis dikirim)', v.pembahasan, true)}
+    <label class="row" style="align-items:center;gap:10px;margin-top:14px;font-weight:700"><input type="checkbox" id="e-aktif" ${v.aktif ? 'checked' : ''} style="width:22px;height:22px;flex:none"> Aktif (tampil di kuis siswa)</label>
+    <p id="e-err" class="err-text" role="alert"></p>
+    <div class="row" style="margin-top:12px"><button type="button" class="btn ghost" id="e-batal">Batal</button><button class="btn accent" id="e-simpan"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Simpan soal</button></div></form>`;
+  $('#e-tanya').focus();
+  $('#e-batal').onclick = renderBank;
+  $('#g-form').onsubmit = async e => {
+    e.preventDefault();
+    const soal = { id: s?.id || '', bab: $('#e-bab').value, pertanyaan: $('#e-tanya').value, a: $('#e-a').value, b: $('#e-b').value, c: $('#e-c').value, d: $('#e-d').value,
+      jawaban: $('#e-kunci').value, pembahasan: $('#e-bahas').value, aktif: $('#e-aktif').checked };
+    const btn = $('#e-simpan'); btn.disabled = true;
+    try {
+      const j = await api('/api/guru', { method: 'POST', token: guru.token, body: { aksi: 'simpan', soal } });
+      const i = guru.soal.findIndex(x => x.id === j.soal.id);
+      if (i < 0) guru.soal.push(j.soal); else guru.soal[i] = j.soal;
+      guru.bab = j.soal.bab; renderBank(); toast('Soal tersimpan.');
+    } catch (err) { if (err.status === 401) return gagalGuru(err); $('#e-err').textContent = err.message; btn.disabled = false; }
+  };
+}
+
+async function hapusSoal(id) {
+  if (!confirm('Hapus soal ini? Tindakan ini tidak bisa dibatalkan.')) return;
+  try {
+    await api('/api/guru', { method: 'POST', token: guru.token, body: { aksi: 'hapus', id } });
+    guru.soal = guru.soal.filter(s => s.id !== id); renderBank(); toast('Soal dihapus.');
+  } catch (err) { gagalGuru(err); }
 }
 
 function renderTentang() {
@@ -379,15 +526,15 @@ function renderTentang() {
 /* =====================================================================
    ROUTER
    ===================================================================== */
-const SCREENS = { '': 's-splash', home: 's-home', materi: 's-materi', simulasi: 's-materi', bab: 's-bab', sim: 's-sim', ar: 's-ar', scan: 's-scan', marker: 's-marker', kuis: 's-kuis', tentang: 's-tentang' };
+const SCREENS = { '': 's-splash', home: 's-home', materi: 's-materi', simulasi: 's-materi', bab: 's-bab', sim: 's-sim', ar: 's-ar', scan: 's-scan', marker: 's-marker', kuis: 's-kuis', tentang: 's-tentang', guru: 's-guru' };
 const TAB_OF = { bab: 'materi', sim: 'simulasi', ar: 'simulasi' };
 const ENTER = {
   home: renderHome, materi: a => enterMateri(a ?? '', false), simulasi: () => enterMateri(undefined, true), bab: enterBab, sim: enterSim, ar: enterAR,
-  scan: enterScan, marker: enterMarker, kuis: () => { if (!quiz.qs.length || quiz.log.length === quiz.qs.length) enterKuis(); }, tentang: renderTentang,
+  scan: enterScan, marker: enterMarker, kuis: enterKuis, tentang: renderTentang, guru: enterGuru,
 };
 const stack = [];
 function route() {
-  const [name = '', arg] = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
+  const [name = '', arg, arg2] = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
   if (stack.at(-2) === location.hash) stack.pop(); else stack.push(location.hash);
   if (name !== 'sim') stopCam();
   if (name !== 'scan') stopScan();
@@ -397,7 +544,7 @@ function route() {
   const tab = TAB_OF[name] || name;
   nav.querySelectorAll('a').forEach(a => a.dataset.tab === tab ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
   window.scrollTo(0, 0);
-  ENTER[name]?.(arg);
+  ENTER[name]?.(arg, arg2);
   if (id !== 's-splash') $(`#${id} h1`)?.focus({ preventScroll: true });
 }
 
@@ -408,6 +555,7 @@ document.addEventListener('click', e => {
 });
 $('#bab-search').addEventListener('input', e => { filt.q = e.target.value.trim(); renderBabList(); });
 $('#print-btn').addEventListener('click', () => window.print());
+$('#guru-keluar').addEventListener('click', () => { guru.token = ''; sesi.set(''); renderLogin(); toast('Anda keluar dari mode guru.'); });
 
 bindSimTools();
 addEventListener('hashchange', route);

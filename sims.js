@@ -147,11 +147,13 @@ export function toolkit(group) {
   return { THREE, V, group, mat, add, box, sphere, cyl, line, segments, circlePts, rod, arrow, label, spring, panel, trace, grid };
 }
 
+// SIMS[bab] = { modes: [ { mode, label, params, cam, target, fitW?, build } ] } — satu mode per rumus.
 export const SIMS = {};
-const sim = (id, def) => { SIMS[id] = def; };
+export const sim = (id, def) => { (SIMS[id] ??= { modes: [] }).modes.push(def); };
+export { V, UP, deg, g, clamp };
 
 /* ======================= KELAS X ======================= */
-sim('pengukuran', {
+sim('pengukuran', { mode: 'jangka-sorong', label: 'Jangka sorong',
   params: [{ k: 'L', label: 'Panjang benda', min: 0.5, max: 5, step: 0.01, val: 2.37, unit: 'cm' }],
   fitW: 5.2, cam: [2.6, -0.1, 5.4], target: [2.6, -0.3, 0],
   build(T) {
@@ -186,7 +188,7 @@ sim('pengukuran', {
   },
 });
 
-sim('vektor', {
+sim('vektor', { mode: 'resultan', label: 'Resultan',
   params: [
     { k: 'A', label: 'Besar vektor A', min: 1, max: 8, step: 0.5, val: 4, unit: 'N' }, { k: 'tA', label: 'Arah A', min: 0, max: 360, step: 5, val: 30, unit: '°' },
     { k: 'B', label: 'Besar vektor B', min: 1, max: 8, step: 0.5, val: 3, unit: 'N' }, { k: 'tB', label: 'Arah B', min: 0, max: 360, step: 5, val: 120, unit: '°' }],
@@ -212,7 +214,7 @@ sim('vektor', {
   },
 });
 
-sim('gerak-lurus', {
+sim('gerak-lurus', { mode: 'glbb', label: 'GLB & GLBB',
   params: [{ k: 'v0', label: 'Kecepatan awal v₀', min: 0, max: 15, step: 0.5, val: 5, unit: 'm/s' }, { k: 'a', label: 'Percepatan a', min: -3, max: 4, step: 0.5, val: 2, unit: 'm/s²' }],
   cam: [0, 2.6, 8.5], target: [0, 0.3, 0],
   build(T) {
@@ -251,7 +253,7 @@ sim('gerak-lurus', {
   },
 });
 
-sim('parabola', {
+sim('parabola', { mode: 'miring', label: 'Sudut elevasi',
   params: [{ k: 'v0', label: 'Kecepatan awal v₀', min: 5, max: 25, step: 0.5, val: 20, unit: 'm/s' }, { k: 'th', label: 'Sudut elevasi θ', min: 10, max: 80, step: 1, val: 45, unit: '°' }],
   cam: [0, 3, 11.5], target: [0, 2.2, 0],
   build(T) {
@@ -286,7 +288,7 @@ sim('parabola', {
   },
 });
 
-sim('melingkar', {
+sim('melingkar', { mode: 'gmb', label: 'Gerak melingkar',
   params: [{ k: 'r', label: 'Jari-jari r', min: 0.5, max: 3, step: 0.1, val: 2, unit: 'm' }, { k: 'v', label: 'Kelajuan v', min: 1, max: 10, step: 0.5, val: 4, unit: 'm/s' },
     { k: 'm', label: 'Massa m', min: 0.1, max: 2, step: 0.1, val: 0.5, unit: 'kg' }],
   cam: [0, 5, 5.5], target: [0, 0, 0],
@@ -315,7 +317,7 @@ sim('melingkar', {
   },
 });
 
-sim('newton', {
+sim('newton', { mode: 'bidang-miring', label: 'Bidang miring',
   params: [{ k: 'th', label: 'Sudut bidang miring θ', min: 0, max: 60, step: 1, val: 30, unit: '°' }, { k: 'm', label: 'Massa balok', min: 1, max: 10, step: 0.5, val: 2, unit: 'kg' },
     { k: 'mu', label: 'Koefisien gesek μ', min: 0, max: 1, step: 0.05, val: 0.2, unit: '' }],
   cam: [0, 2.4, 9], target: [0, 1.4, 0],
@@ -353,7 +355,7 @@ sim('newton', {
   },
 });
 
-sim('gravitasi', {
+sim('gravitasi', { mode: 'orbit', label: 'Orbit & Kepler',
   params: [{ k: 'r0', label: 'Jarak awal planet', min: 1, max: 4, step: 0.1, val: 2, unit: 'SA', rebuild: true },
     { k: 'kv', label: 'Kecepatan awal (× v orbit lingkaran)', min: 0.5, max: 1.45, step: 0.05, val: 1, unit: '', rebuild: true },
     { k: 'M', label: 'Massa bintang', min: 0.5, max: 2, step: 0.1, val: 1, unit: 'M☉', rebuild: true }],
@@ -386,7 +388,7 @@ sim('gravitasi', {
   },
 });
 
-sim('usaha-energi', {
+sim('usaha-energi', { mode: 'energi-mekanik', label: 'Energi mekanik',
   params: [{ k: 'L', label: 'Panjang tali L', min: 0.5, max: 3, step: 0.1, val: 2, unit: 'm', rebuild: true }, { k: 'th0', label: 'Simpangan awal θ₀', min: 5, max: 80, step: 1, val: 45, unit: '°', rebuild: true },
     { k: 'm', label: 'Massa beban', min: 0.5, max: 5, step: 0.5, val: 1, unit: 'kg' }],
   cam: [1, 1.8, 7.5], target: [1, 1.6, 0],
@@ -417,7 +419,7 @@ sim('usaha-energi', {
   },
 });
 
-sim('momentum', {
+sim('momentum', { mode: 'tumbukan', label: 'Tumbukan',
   params: [{ k: 'm1', label: 'Massa troli 1', min: 1, max: 5, step: 0.5, val: 2, unit: 'kg', rebuild: true }, { k: 'v1', label: 'Kecepatan troli 1', min: 0, max: 8, step: 0.5, val: 4, unit: 'm/s', rebuild: true },
     { k: 'm2', label: 'Massa troli 2', min: 1, max: 5, step: 0.5, val: 1, unit: 'kg', rebuild: true }, { k: 'v2', label: 'Kecepatan troli 2', min: -6, max: 4, step: 0.5, val: 0, unit: 'm/s', rebuild: true },
     { k: 'e', label: 'Koefisien restitusi e', min: 0, max: 1, step: 0.05, val: 1, unit: '', rebuild: true }],
@@ -454,7 +456,7 @@ sim('momentum', {
   },
 });
 
-sim('getaran', {
+sim('getaran', { mode: 'pegas', label: 'Pegas',
   params: [{ k: 'k', label: 'Konstanta pegas k', min: 10, max: 200, step: 5, val: 50, unit: 'N/m' }, { k: 'm', label: 'Massa beban m', min: 0.1, max: 2, step: 0.1, val: 0.5, unit: 'kg' },
     { k: 'A', label: 'Amplitudo A', min: 0.05, max: 0.5, step: 0.05, val: 0.3, unit: 'm' }],
   cam: [1.6, 1.8, 7], target: [1.6, 1.8, 0],
@@ -481,7 +483,7 @@ sim('getaran', {
   },
 });
 
-sim('energi-terbarukan', {
+sim('energi-terbarukan', { mode: 'angin', label: 'Turbin angin',
   params: [{ k: 'v', label: 'Kecepatan angin', min: 0, max: 20, step: 0.5, val: 8, unit: 'm/s' }, { k: 'r', label: 'Panjang bilah (jari-jari)', min: 5, max: 50, step: 1, val: 20, unit: 'm' },
     { k: 'eta', label: 'Efisiensi turbin η', min: 10, max: 59, step: 1, val: 40, unit: '%' }],
   fitW: 6.5, cam: [5.5, 3.2, 6.5], target: [0, 2.6, 0],
@@ -507,7 +509,7 @@ sim('energi-terbarukan', {
 });
 
 /* ======================= KELAS XI ======================= */
-sim('rotasi', {
+sim('rotasi', { mode: 'menggelinding', label: 'Menggelinding',
   params: [{ k: 'th', label: 'Sudut bidang miring θ', min: 5, max: 45, step: 1, val: 30, unit: '°', rebuild: true }],
   cam: [1.5, 6, 7], target: [0, 1.2, 0],
   build(T, p) {
@@ -545,7 +547,7 @@ sim('rotasi', {
   },
 });
 
-sim('elastisitas', {
+sim('elastisitas', { mode: 'pegas', label: 'Susunan pegas',
   params: [{ k: 'k', label: 'Konstanta tiap pegas k', min: 50, max: 500, step: 10, val: 200, unit: 'N/m' }, { k: 'm', label: 'Massa beban', min: 0, max: 5, step: 0.1, val: 2, unit: 'kg' },
     { k: 'mode', label: 'Susunan pegas', opts: [['tunggal', 'Tunggal'], ['seri', 'Seri'], ['paralel', 'Paralel']], val: 'tunggal' }],
   cam: [0, 1.6, 6.5], target: [0, 1.6, 0],
@@ -576,7 +578,7 @@ sim('elastisitas', {
   },
 });
 
-sim('fluida-statis', {
+sim('fluida-statis', { mode: 'archimedes', label: 'Archimedes',
   params: [{ k: 'rb', label: 'Massa jenis benda', min: 200, max: 2000, step: 50, val: 600, unit: 'kg/m³' },
     { k: 'rf', label: 'Jenis fluida', opts: [['1000', 'Air'], ['800', 'Minyak'], ['1030', 'Air laut'], ['1260', 'Gliserin']], val: '1000' }],
   cam: [0, 1.6, 6.5], target: [0, 1.2, 0],
@@ -609,7 +611,7 @@ sim('fluida-statis', {
   },
 });
 
-sim('fluida-dinamis', {
+sim('fluida-dinamis', { mode: 'bernoulli', label: 'Kontinuitas & Bernoulli',
   params: [{ k: 'v1', label: 'Kecepatan di pipa besar v₁', min: 0.5, max: 4, step: 0.1, val: 1.5, unit: 'm/s' },
     { k: 'ratio', label: 'Perbandingan luas A₁/A₂', min: 1, max: 4, step: 0.1, val: 2, unit: '', rebuild: true }],
   cam: [0, 1.6, 8.5], target: [0, 0.9, 0],
@@ -642,7 +644,7 @@ sim('fluida-dinamis', {
   },
 });
 
-sim('suhu-kalor', {
+sim('suhu-kalor', { mode: 'wujud', label: 'Perubahan wujud',
   params: [{ k: 'm', label: 'Massa es', min: 0.1, max: 1, step: 0.05, val: 0.5, unit: 'kg', rebuild: true }, { k: 'P', label: 'Daya pemanas', min: 500, max: 3000, step: 100, val: 1500, unit: 'W' }],
   cam: [1.8, 1.6, 7], target: [1.8, 1.3, 0],
   build(T, p) {
@@ -686,7 +688,7 @@ sim('suhu-kalor', {
   },
 });
 
-sim('teori-kinetik', {
+sim('teori-kinetik', { mode: 'gas', label: 'Gas ideal',
   params: [{ k: 'T', label: 'Suhu gas', min: 100, max: 1000, step: 10, val: 300, unit: 'K' }, { k: 'V', label: 'Volume wadah', min: 10, max: 40, step: 1, val: 22, unit: 'L' },
     { k: 'N', label: 'Jumlah partikel (tampilan)', min: 10, max: 150, step: 10, val: 60, unit: '', rebuild: true }],
   cam: [3.2, 2.4, 4.2], target: [0, 0, 0],
@@ -722,7 +724,7 @@ sim('teori-kinetik', {
   },
 });
 
-sim('termodinamika', {
+sim('termodinamika', { mode: 'proses', label: 'Proses gas',
   params: [{ k: 'proses', label: 'Jenis proses', opts: [['isobarik', 'Isobarik'], ['isokhorik', 'Isokhorik'], ['isotermal', 'Isotermal'], ['adiabatik', 'Adiabatik']], val: 'isobarik' },
     { k: 'f', label: 'Faktor perubahan (V atau T)', min: 0.5, max: 2.5, step: 0.1, val: 1.5, unit: '×' }],
   cam: [1.8, 1.8, 7.5], target: [1.8, 1.6, 0],
@@ -764,7 +766,7 @@ sim('termodinamika', {
   },
 });
 
-sim('gelombang', {
+sim('gelombang', { mode: 'tali', label: 'Gelombang tali',
   params: [{ k: 'A', label: 'Amplitudo A', min: 0.1, max: 1, step: 0.05, val: 0.5, unit: 'm' }, { k: 'f', label: 'Frekuensi f', min: 0.2, max: 2, step: 0.1, val: 0.5, unit: 'Hz' },
     { k: 'lam', label: 'Panjang gelombang λ', min: 1, max: 6, step: 0.5, val: 3, unit: 'm' }, { k: 'mode', label: 'Jenis', opts: [['berjalan', 'Berjalan'], ['stasioner', 'Stasioner']], val: 'berjalan' }],
   cam: [0, 0.5, 11], target: [0, 0, 0],
@@ -795,7 +797,7 @@ sim('gelombang', {
   },
 });
 
-sim('bunyi', {
+sim('bunyi', { mode: 'doppler', label: 'Efek Doppler',
   params: [{ k: 'vs', label: 'Kecepatan sumber bunyi', min: 0, max: 300, step: 10, val: 120, unit: 'm/s' }, { k: 'fs', label: 'Frekuensi sumber', min: 200, max: 1000, step: 10, val: 500, unit: 'Hz' }],
   cam: [0, 9, 7.5], target: [0, 0, 0],
   build(T) {
@@ -820,7 +822,7 @@ sim('bunyi', {
   },
 });
 
-sim('cahaya', {
+sim('cahaya', { mode: 'celah-ganda', label: 'Celah ganda',
   params: [{ k: 'lam', label: 'Panjang gelombang λ', min: 380, max: 750, step: 5, val: 600, unit: 'nm' }, { k: 'd', label: 'Jarak antarcelah d', min: 0.1, max: 1, step: 0.05, val: 0.3, unit: 'mm' },
     { k: 'L', label: 'Jarak celah ke layar L', min: 0.5, max: 3, step: 0.1, val: 1, unit: 'm' }],
   cam: [-1.5, 2.2, 7], target: [0.2, 0, 0],
@@ -866,7 +868,7 @@ sim('cahaya', {
   },
 });
 
-sim('optik', {
+sim('optik', { mode: 'lensa', label: 'Lensa',
   params: [{ k: 'jenis', label: 'Jenis lensa', opts: [['cembung', 'Cembung'], ['cekung', 'Cekung']], val: 'cembung' }, { k: 'f', label: 'Jarak fokus |f|', min: 5, max: 20, step: 1, val: 10, unit: 'cm' },
     { k: 's', label: 'Jarak benda s', min: 3, max: 40, step: 1, val: 15, unit: 'cm' }, { k: 'h', label: 'Tinggi benda h', min: 1, max: 4, step: 0.5, val: 2, unit: 'cm' }],
   cam: [0.6, 0.2, 10.5], target: [0.6, 0, 0],
@@ -911,7 +913,7 @@ sim('optik', {
 });
 
 /* ======================= KELAS XII ======================= */
-sim('listrik-statis', {
+sim('listrik-statis', { mode: 'coulomb', label: 'Hukum Coulomb',
   params: [{ k: 'q1', label: 'Muatan q₁', min: -5, max: 5, step: 0.5, val: 3, unit: 'μC' }, { k: 'q2', label: 'Muatan q₂', min: -5, max: 5, step: 0.5, val: -3, unit: 'μC' },
     { k: 'r', label: 'Jarak r', min: 0.1, max: 1, step: 0.05, val: 0.5, unit: 'm' }],
   cam: [0, 0, 9], target: [0, 0, 0],
@@ -944,7 +946,7 @@ sim('listrik-statis', {
   },
 });
 
-sim('listrik-dc', {
+sim('listrik-dc', { mode: 'rangkaian', label: 'Rangkaian',
   params: [{ k: 'eps', label: 'GGL baterai ε', min: 1, max: 24, step: 1, val: 12, unit: 'V' }, { k: 'R1', label: 'Hambatan R₁', min: 1, max: 50, step: 1, val: 10, unit: 'Ω' },
     { k: 'R2', label: 'Hambatan R₂', min: 1, max: 50, step: 1, val: 20, unit: 'Ω' }, { k: 'mode', label: 'Susunan', opts: [['seri', 'Seri'], ['paralel', 'Paralel']], val: 'seri' }],
   cam: [0, 0.3, 8], target: [0, 0, 0],
@@ -989,7 +991,7 @@ sim('listrik-dc', {
   },
 });
 
-sim('magnet', {
+sim('magnet', { mode: 'kawat-lurus', label: 'Kawat lurus',
   params: [{ k: 'I', label: 'Kuat arus I', min: 1, max: 20, step: 1, val: 10, unit: 'A' }, { k: 'arah', label: 'Arah arus', opts: [['atas', 'Ke atas'], ['bawah', 'Ke bawah']], val: 'atas' },
     { k: 'a', label: 'Jarak kompas a', min: 0.02, max: 0.2, step: 0.01, val: 0.05, unit: 'm' }],
   cam: [3.5, 3.5, 5.5], target: [0, 0, 0],
@@ -1027,7 +1029,7 @@ sim('magnet', {
   },
 });
 
-sim('induksi', {
+sim('induksi', { mode: 'faraday', label: 'Hukum Faraday',
   params: [{ k: 'v', label: 'Kecepatan maksimum magnet', min: 0.5, max: 4, step: 0.1, val: 2, unit: 'm/s' }, { k: 'N', label: 'Jumlah lilitan N', min: 50, max: 500, step: 10, val: 200, unit: '' },
     { k: 'B', label: 'Kuat magnet B', min: 0.1, max: 1, step: 0.05, val: 0.5, unit: 'T' }],
   cam: [0.8, 0.8, 7.5], target: [0.8, 0.2, 0],
@@ -1065,7 +1067,7 @@ sim('induksi', {
   },
 });
 
-sim('ac', {
+sim('ac', { mode: 'generator', label: 'Generator',
   params: [{ k: 'f', label: 'Frekuensi putaran f', min: 0.2, max: 2, step: 0.1, val: 0.5, unit: 'Hz' }, { k: 'N', label: 'Jumlah lilitan N', min: 10, max: 200, step: 10, val: 100, unit: '' },
     { k: 'B', label: 'Medan magnet B', min: 0.1, max: 1, step: 0.05, val: 0.5, unit: 'T' }],
   cam: [0, 1.4, 8], target: [0, 1, 0],
@@ -1102,7 +1104,7 @@ const GEM = {
   ultraviolet: ['Ultraviolet', 250e-9, 1.1, 0x7c3aed, 'sterilisasi, pembentukan vitamin D'], sinarx: ['Sinar-X', 0.1e-9, 0.75, 0x0284c7, 'foto rontgen, pemeriksaan bagasi'],
   gamma: ['Sinar gamma', 1e-12, 0.5, 0x16a34a, 'terapi kanker, sterilisasi alat medis'],
 };
-sim('gem', {
+sim('gem', { mode: 'spektrum', label: 'Spektrum',
   params: [{ k: 'jenis', label: 'Spektrum', opts: Object.entries(GEM).map(([k, v]) => [k, v[0]]), val: 'tampak' }],
   cam: [4.5, 2.6, 7.5], target: [0, 0, 0],
   build(T) {
@@ -1126,7 +1128,7 @@ sim('gem', {
   },
 });
 
-sim('kuantum', {
+sim('kuantum', { mode: 'fotolistrik', label: 'Efek fotolistrik',
   params: [{ k: 'lam', label: 'Panjang gelombang cahaya', min: 100, max: 700, step: 10, val: 400, unit: 'nm' }, { k: 'I', label: 'Intensitas cahaya', min: 1, max: 10, step: 1, val: 5, unit: '' },
     { k: 'W', label: 'Logam katode', opts: [['2.14', 'Sesium (2,14 eV)'], ['2.28', 'Natrium (2,28 eV)'], ['4.3', 'Seng (4,3 eV)'], ['4.7', 'Tembaga (4,7 eV)']], val: '2.28' }],
   cam: [0, 1.4, 7.5], target: [0, 0.6, 0],
@@ -1164,7 +1166,7 @@ sim('kuantum', {
   },
 });
 
-sim('relativitas', {
+sim('relativitas', { mode: 'dilatasi', label: 'Dilatasi & kontraksi',
   params: [{ k: 'v', label: 'Kecepatan pesawat', min: 0, max: 0.99, step: 0.01, val: 0.6, unit: 'c' }],
   cam: [0, 0.6, 9.5], target: [0, 0.4, 0],
   build(T) {
@@ -1200,7 +1202,7 @@ sim('relativitas', {
   },
 });
 
-sim('atom', {
+sim('atom', { mode: 'bohr', label: 'Model Bohr',
   params: [{ k: 'na', label: 'Kulit awal n', min: 1, max: 6, step: 1, val: 3, unit: '', rebuild: true }, { k: 'nb', label: 'Kulit akhir n', min: 1, max: 6, step: 1, val: 2, unit: '', rebuild: true }],
   fitW: 14, cam: [1.6, 0, 10], target: [1.6, 0, 0],
   build(T, p) {
@@ -1237,7 +1239,7 @@ sim('atom', {
   },
 });
 
-sim('inti', {
+sim('inti', { mode: 'peluruhan', label: 'Peluruhan',
   params: [{ k: 'T', label: 'Waktu paruh T½', min: 1, max: 10, step: 0.5, val: 3, unit: 's', rebuild: true }, { k: 'N0', label: 'Jumlah inti awal N₀', min: 100, max: 400, step: 50, val: 200, unit: '', rebuild: true }],
   cam: [1.6, 1.2, 8], target: [1.6, 0.6, 0],
   build(T, p) {

@@ -66,6 +66,8 @@ sub,sup{font-size:.7em;line-height:0}
 .k-3d{background:var(--accent-50);color:#9A3412}
 .muted{color:var(--muted)}
 .rumus{background:var(--primary-50);border-left:4px solid var(--primary);padding:10px 14px;border-radius:10px;margin:10px 0;font-weight:700;font-size:15px;line-height:1.7}
+.lead{font-size:17px;background:var(--accent-50);border-radius:12px;padding:12px 14px}
+.prose h3{font-size:18px;margin-top:22px;color:var(--primary-700)}
 .rumus-inline{background:var(--primary-50);padding:1px 6px;border-radius:6px;font-weight:700;white-space:nowrap}
 table{width:100%;border-collapse:collapse;font-size:14px;margin:12px 0;background:#fff;border-radius:12px;overflow:hidden}
 th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--primary-100);vertical-align:top}
@@ -133,6 +135,13 @@ label.field{display:block;font-weight:800;font-size:14px;margin-bottom:6px}
 .sim-label.small{font-size:11px;font-weight:700}
 .sim-label.accent{color:#9A3412}
 .tools{display:flex;justify-content:center;gap:10px;margin-bottom:14px}
+/* simulasi: panggung tidak ikut tergulir, hanya panel kanan/bawah yang bergulir */
+#s-sim:not([hidden]){display:flex;flex-direction:column;height:calc(100dvh - var(--nav-h) - var(--safe-b));padding-bottom:10px;overflow:hidden}
+#s-sim .topbar{flex:none;margin-bottom:10px}
+.sim-layout{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px}
+.sim-layout .stage{flex:none;height:min(44dvh,420px);margin:0}
+.sim-panel{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 2px 8px}
+@media (min-width:900px){.app:has(#s-sim:not([hidden])){max-width:1240px}.sim-layout{flex-direction:row}.sim-layout .stage{flex:1 1 auto;height:auto}.sim-panel{flex:0 0 400px}}
 .speed{font-size:12px;font-weight:800}
 .controls{display:flex;flex-direction:column;gap:14px}
 .ctrl label{display:flex;justify-content:space-between;gap:10px;font-weight:800;font-size:14px;margin-bottom:4px}
@@ -163,6 +172,17 @@ model-viewer .btn{position:absolute;left:50%;bottom:14px;transform:translateX(-5
 .opt{text-align:left;min-height:52px;padding:12px 14px;border-radius:14px;background:#fff;border:2px solid var(--border);font-weight:700;display:flex;gap:10px;align-items:center}
 .opt .key{width:28px;height:28px;border-radius:9px;background:var(--primary-50);color:var(--primary);display:grid;place-items:center;font-weight:800;flex-shrink:0}
 .opt.right{border-color:var(--ok);background:var(--ok-50)} .opt.wrong{border-color:var(--err);background:var(--err-50)}
+.opt[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-50)}
+.opt[aria-pressed="true"] .key{background:var(--primary);color:#fff}
+.qnav{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 14px}
+.qnav button{width:44px;height:44px;border-radius:12px;border:2px solid var(--border);background:#fff;font-weight:800}
+.qnav button.isi{background:var(--primary-50);border-color:var(--primary)}
+.qnav button[aria-current="step"]{background:var(--primary);border-color:var(--primary);color:#fff}
+.review{border-top:1px solid var(--primary-100);padding-top:12px;margin-top:12px}
+.review:first-of-type{border-top:0;margin-top:0;padding-top:0}
+textarea.input{min-height:96px;resize:vertical;line-height:1.5}
+select.input{appearance:auto}
+.err-text{color:var(--err);font-weight:700;font-size:14px;margin-top:6px}
 .feedback{border-radius:14px;padding:12px 14px;font-weight:700;margin-bottom:12px}
 .feedback.ok{background:var(--ok-50);color:var(--ok)} .feedback.no{background:var(--err-50);color:var(--err)}
 .score-ring{width:140px;height:140px;margin:6px auto 12px;display:block}
@@ -218,6 +238,7 @@ model-viewer .btn{position:absolute;left:50%;bottom:14px;transform:translateX(-5
     <a class="tile" href="#/kuis"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>Kuis</a>
     <a class="tile" href="#/marker"><i class="fa-solid fa-print" aria-hidden="true"></i>Marker QR</a>
     <a class="tile" href="#/tentang"><i class="fa-solid fa-bullseye" aria-hidden="true"></i>CP, TP &amp; Panduan</a>
+    <a class="tile" href="#/guru"><i class="fa-solid fa-chalkboard-user" aria-hidden="true"></i>Mode Guru</a>
   </nav>
 </section>
 
@@ -238,23 +259,28 @@ model-viewer .btn{position:absolute;left:50%;bottom:14px;transform:translateX(-5
 
 <section id="s-sim" class="screen" hidden aria-labelledby="sim-title">
   <div class="topbar"><button class="icon-btn" data-back aria-label="Kembali"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button><div style="flex:1"><h1 id="sim-title" tabindex="-1"></h1><p id="sim-sub">Simulasi 3D interaktif</p></div></div>
-  <div class="stage" id="stage">
-    <video id="cam" playsinline muted hidden></video>
+  <div class="sim-layout">
+    <div class="stage" id="stage">
+      <video id="cam" playsinline muted hidden></video>
+    </div>
+    <div class="sim-panel">
+      <div class="tools" role="toolbar" aria-label="Kontrol simulasi">
+        <button class="icon-btn" id="t-play" aria-pressed="false" aria-label="Jeda simulasi"><i class="fa-solid fa-pause" aria-hidden="true"></i></button>
+        <button class="icon-btn" id="t-speed" aria-label="Kecepatan simulasi 1 kali"><span class="speed">1×</span></button>
+        <button class="icon-btn" id="t-reset" aria-label="Ulangi simulasi"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></button>
+        <button class="icon-btn" id="t-labels" aria-pressed="true" aria-label="Tampilkan label"><i class="fa-solid fa-tag" aria-hidden="true"></i></button>
+        <button class="icon-btn" id="t-view" aria-label="Kembalikan sudut pandang"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
+      </div>
+      <div class="card" id="sim-modes-card" hidden><h2>Pilih rumus</h2><div class="seg" id="sim-modes" role="group" aria-label="Pilih rumus yang disimulasikan"></div><p class="muted" id="sim-mode-desc" style="font-size:14px;margin-top:8px"></p></div>
+      <div class="card"><h2>Atur besaran</h2><div class="controls" id="sim-controls"></div></div>
+      <div class="card"><h2>Hasil perhitungan</h2><div class="facts" id="sim-readout" aria-live="polite"></div></div>
+      <div class="row" style="margin-bottom:14px">
+        <a class="btn accent" id="sim-ar" href="#"><i class="fa-solid fa-vr-cardboard" aria-hidden="true"></i> Lihat di AR</a>
+        <button class="btn ghost" id="t-cam" aria-pressed="false"><i class="fa-solid fa-camera" aria-hidden="true"></i> Mode Kamera</button>
+      </div>
+      <a class="btn ghost" id="sim-materi" href="#"><i class="fa-solid fa-book-open" aria-hidden="true"></i> Baca materi bab ini</a>
+    </div>
   </div>
-  <div class="tools" role="toolbar" aria-label="Kontrol simulasi">
-    <button class="icon-btn" id="t-play" aria-pressed="false" aria-label="Jeda simulasi"><i class="fa-solid fa-pause" aria-hidden="true"></i></button>
-    <button class="icon-btn" id="t-speed" aria-label="Kecepatan simulasi 1 kali"><span class="speed">1×</span></button>
-    <button class="icon-btn" id="t-reset" aria-label="Ulangi simulasi"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></button>
-    <button class="icon-btn" id="t-labels" aria-pressed="true" aria-label="Tampilkan label"><i class="fa-solid fa-tag" aria-hidden="true"></i></button>
-    <button class="icon-btn" id="t-view" aria-label="Kembalikan sudut pandang"><i class="fa-solid fa-expand" aria-hidden="true"></i></button>
-  </div>
-  <div class="row" style="margin-bottom:14px">
-    <a class="btn accent" id="sim-ar" href="#"><i class="fa-solid fa-vr-cardboard" aria-hidden="true"></i> Lihat di AR</a>
-    <button class="btn ghost" id="t-cam" aria-pressed="false"><i class="fa-solid fa-camera" aria-hidden="true"></i> Mode Kamera</button>
-  </div>
-  <div class="card"><h2>Hasil perhitungan</h2><div class="facts" id="sim-readout" aria-live="polite"></div></div>
-  <div class="card"><h2>Atur besaran</h2><div class="controls" id="sim-controls"></div></div>
-  <a class="btn ghost" id="sim-materi" href="#"><i class="fa-solid fa-book-open" aria-hidden="true"></i> Baca materi bab ini</a>
 </section>
 
 <section id="s-ar" class="screen" hidden aria-labelledby="ar-title">
@@ -292,6 +318,12 @@ model-viewer .btn{position:absolute;left:50%;bottom:14px;transform:translateX(-5
 <section id="s-tentang" class="screen" hidden aria-labelledby="tentang-title">
   <div class="topbar"><button class="icon-btn" data-back aria-label="Kembali"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button><h1 id="tentang-title" tabindex="-1">CP, TP &amp; Panduan</h1></div>
   <div id="tentang-body"></div>
+</section>
+
+<section id="s-guru" class="screen" hidden aria-labelledby="guru-title">
+  <div class="topbar"><button class="icon-btn" data-back aria-label="Kembali"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button><div style="flex:1"><h1 id="guru-title" tabindex="-1">Mode Guru</h1><p>Kelola bank soal kuis</p></div>
+    <button class="icon-btn" id="guru-keluar" aria-label="Keluar dari mode guru" hidden><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i></button></div>
+  <div id="guru-body"></div>
 </section>
 
 <div id="toast" role="status" aria-live="polite"></div>
