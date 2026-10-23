@@ -518,8 +518,8 @@ function renderTentang() {
     <div class="card"><h2><i class="fa-solid fa-list-check" aria-hidden="true" style="color:var(--primary)"></i> Tujuan Pembelajaran</h2><ol class="prose" style="padding-left:20px">${TP.map(t => `<li>${t}</li>`).join('')}</ol></div>
     <div class="card"><h2><i class="fa-solid fa-book-bookmark" aria-hidden="true" style="color:var(--primary)"></i> Panduan Penggunaan</h2>
       <ol class="list" style="list-style:none">${PANDUAN.map(([t, d], i) => `<li class="row" style="align-items:flex-start;gap:12px"><span class="badge" style="width:34px;height:34px;flex:0 0 34px;border-radius:50%;background:var(--primary);color:#fff;font-size:15px;font-weight:800">${i + 1}</span><p style="flex:1"><b>${t}.</b> ${d}</p></li>`).join('')}</ol></div>
-    <div class="card"><h2><i class="fa-solid fa-users" aria-hidden="true" style="color:var(--primary)"></i> Tim Pengembang</h2>
-      ${CONFIG.pengembang.map(p => `<div class="item" style="box-shadow:none;border:2px solid var(--primary-100);margin-top:10px"><span class="badge"><i class="fa-solid fa-user" aria-hidden="true"></i></span><div><h3>${esc(p.nama)}</h3><div class="meta">${esc(p.peran)} · ${esc(p.instansi)}</div><div class="meta">${esc(p.email)}</div></div></div>`).join('')}
+    <div class="card"><h2><i class="fa-solid fa-user" aria-hidden="true" style="color:var(--primary)"></i> Pengembang</h2>
+      ${CONFIG.pengembang.map(p => `<div class="item" style="box-shadow:none;border:2px solid var(--primary-100);margin-top:10px"><span class="badge"><i class="fa-solid fa-user" aria-hidden="true"></i></span><div><h3>${esc(p.nama)}</h3><div class="meta">${esc(p.peran)}${p.instansi ? ' · ' + esc(p.instansi) : ''}</div><div class="meta">${esc(p.email)}</div></div></div>`).join('')}
       <p class="muted" style="font-size:13px;margin-top:12px">${CONFIG.appName} v${CONFIG.versi} · ${BAB.length} bab, ${SIM_IDS.length} simulasi 3D (three.js), AR via WebXR / AR Quick Look. Percepatan gravitasi g = 10 m/s².</p></div>`;
 }
 

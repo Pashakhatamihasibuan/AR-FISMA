@@ -4,14 +4,13 @@ import { MATERI_X } from './materi-x.js';
 import { MATERI_XI } from './materi-xi.js';
 import { MATERI_XII } from './materi-xii.js';
 
-// Ganti isi CONFIG ini dengan identitas pengembang / dosen pembimbing Anda.
+// Identitas pengembang yang tampil di menu CP, TP & Panduan.
 export const CONFIG = {
   appName: 'AR-FISMA',
   tagline: 'Augmented Reality Fisika SMA',
   versi: '2.0',
   pengembang: [
-    { nama: 'Nama Pengembang', peran: 'Pengembang Media', instansi: 'Program Studi / Universitas', email: 'email@kampus.ac.id' },
-    { nama: 'Nama Dosen Pembimbing', peran: 'Dosen Pembimbing', instansi: 'Program Studi / Universitas', email: 'email@kampus.ac.id' },
+    { nama: 'Pasha Khatami Hasibuan, S.Kom.', peran: 'Pengembang', email: 'pashakhatamihsb@gmail.com' },
   ],
 };
 
